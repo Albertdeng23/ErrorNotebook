@@ -1,0 +1,8 @@
+# 忽略环境变量文件
+.env
+
+# 你可能还想忽略其他常见的文件/文件夹
+node_modules/
+dist/
+.vscode/
+__pycache__/

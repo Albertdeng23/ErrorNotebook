@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的错题本</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- 引入 Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>我的错题本</h1>
+
+        <!-- ==================== 总结和图表区域 ==================== -->
+        <div class="summary-section">
+            <!-- 左侧：周度折线图 -->
+            <div class="chart-container">
+                <h2>近7日错题趋势</h2>
+                <canvas id="weekly-chart"></canvas>
+            </div>
+
+            <!-- 右侧：每日总结 -->
+            {% if daily_summary %}
+            <div class="summary-content">
+                <h2>昨日学习总结 ({{ daily_summary.date }})</h2>
+                {% if 'error' not in daily_summary.ai_summary %}
+                    <p><strong>学习总纲：</strong>{{ daily_summary.ai_summary.general_summary }}</p>
+                    <p><strong>核心知识点：</strong></p>
+                    <ul>
+                        {% for point in daily_summary.ai_summary.knowledge_points_summary %}
+                        <li>{{ point }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="error-text">AI总结生成失败: {{ daily_summary.ai_summary.error }}</p>
+                {% endif %}
+                <div class="summary-stats">
+                    <div class="stat-item">
+                        <strong>昨日错题数：</strong> {{ daily_summary.question_count }} 道
+                    </div>
+                    <div class="stat-item subject-chart-container">
+                        <strong>科目分布：</strong>
+                        <canvas id="subject-bar-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="summary-content placeholder">
+                <h2>学习总结</h2>
+                <p>今天还没有错题记录，或者昨日没有学习记录，暂无总结。</p>
+                <p>坚持记录，系统会在次日为您生成学习报告！</p>
+            </div>
+            {% endif %}
+        </div>
+        <!-- ==================== 总结区域结束 ==================== -->
+
+
+        <!-- 主选项卡按钮 -->
+        <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="review-tab">错题回顾</button>
+            <button class="tab-btn" data-tab="upload-tab">上传错题</button>
+        </div>
+
+        <!-- 主选项卡内容 -->
+        <div class="tab-content">
+            <!-- 1. 错题回顾面板 -->
+            <div id="review-tab" class="tab-pane active">
+                {% if subjects %}
+                <div class="review-container">
+                    <!-- 左侧时间线导航 -->
+                    <nav class="timeline-nav">
+                        <h3>时间目录</h3>
+                        <!-- 使用从后端传递的 all_dates 动态生成时间线 -->
+                        {% for date in all_dates %}
+                            <a href="#date-{{ date }}" data-date="{{ date }}">{{ date }}</a>
+                        {% endfor %}
+                    </nav>
+
+                    <!-- 右侧内容区 -->
+                    <main class="content-area">
+                        <!-- 科目子选项卡按钮 -->
+                        <div class="subject-tab-buttons">
+                            {% for subject in subjects %}
+                            <button class="subject-btn {{ 'active' if loop.first }}" data-subject="{{ subject }}">{{ subject }}</button>
+                            {% endfor %}
+                        </div>
+
+                        <!-- 科目子选项卡内容 (现在是空的容器，由JS填充) -->
+                        <div class="subject-tab-content">
+                            {% for subject in subjects %}
+                            <div id="subject-{{ subject }}" class="subject-pane {{ 'active' if loop.first }}" 
+                                 data-subject-name="{{ subject }}" 
+                                 data-page="1" 
+                                 data-has-more="true" 
+                                 data-is-loading="false">
+                                <!-- 初始加载动画，内容将由JavaScript动态加载到这里 -->
+                                <div class="loader">加载中...</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </main>
+                </div>
+                {% else %}
+                <p style="text-align: center;">你的错题本还是空的，快去“上传错题”添加第一条记录吧！</p>
+                {% endif %}
+            </div>
+
+            <!-- 2. 上传错题面板 (保持不变) -->
+            <div id="upload-tab" class="tab-pane">
+                <form id="upload-form">
+                    <div>
+                        <label for="subject">科目:</label>
+                        <input type="text" id="subject" name="subject" placeholder="例如：数学、物理" required>
+                    </div>
+                    <div>
+                        <label for="user_question">自己的疑问 (可选):</label>
+                        <textarea id="user_question" name="user_question" placeholder="可以告诉AI你的具体困惑，例如：为什么这条辅助线要这么画？"></textarea>
+                    </div>
+                    <div>
+                        <label for="question_image">选择错题图片:</label>
+                        <input type="file" id="question_image" name="question_image" accept="image/*" required>
+                    </div>
+                    <div id="image-preview"></div>
+                    <button type="submit" id="submit-btn">上传并分析</button>
+                    <div id="upload-status"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 将后端数据安全地传递给JavaScript ==================== -->
+    <script>
+        // 使用 tojson 过滤器安全地将Python数据转换为JavaScript对象
+        const weeklyChartData = {{ weekly_chart_data | tojson }};
+        {% if daily_summary and daily_summary.subject_chart_data %}
+        const subjectChartData = {{ daily_summary.subject_chart_data | tojson }};
+        {% endif %}
+    </script>
+    <!-- ==================== 引入主JavaScript文件 ==================== -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

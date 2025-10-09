@@ -1,0 +1,403 @@
+/* --- 全局和基本样式 --- */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f4f7f9;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 20px 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+h1, h2, h3 {
+    color: #2c3e50;
+}
+
+h1 {
+    text-align: center;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+/* --- 总结和图表区域样式 --- */
+.summary-section {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.chart-container {
+    flex: 1;
+    min-width: 300px;
+}
+
+.summary-content {
+    flex: 2;
+}
+
+.summary-section h2 {
+    margin-top: 0;
+    color: #007bff;
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 10px;
+}
+
+.summary-content ul {
+    padding-left: 20px;
+}
+
+.summary-content .placeholder {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+}
+
+.summary-stats {
+    margin-top: 20px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.stat-item {
+    font-size: 1.1em;
+}
+
+.subject-chart-container {
+    max-width: 300px; /* 限制条形图的最大宽度 */
+}
+
+.error-text {
+    color: #dc3545;
+    background-color: #f8d7da;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+
+/* --- 主选项卡样式 --- */
+.tab-buttons {
+    display: flex;
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.tab-buttons button {
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    font-size: 18px;
+    font-weight: 500;
+    color: #555;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.tab-buttons button:hover {
+    color: #007bff;
+}
+
+.tab-buttons button.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+}
+
+.tab-pane {
+    display: none; /* 默认隐藏所有面板 */
+}
+
+.tab-pane.active {
+    display: block; /* 只显示激活的面板 */
+}
+
+/* --- 错题回顾页面布局 --- */
+.review-container {
+    display: flex;
+    gap: 20px;
+}
+
+.timeline-nav {
+    flex: 0 0 180px; /* 固定宽度，不伸缩 */
+    border-right: 1px solid #e0e0e0;
+    padding-right: 20px;
+    height: calc(100vh - 250px); /* 视口高度减去一些边距，可根据总结区域高度微调 */
+    overflow-y: auto; /* 内容多时可滚动 */
+}
+
+.timeline-nav h3 {
+    margin-top: 0;
+}
+
+.timeline-nav a {
+    display: block;
+    padding: 8px 10px;
+    text-decoration: none;
+    color: #3498db;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    transition: background-color 0.2s;
+}
+
+.timeline-nav a:hover {
+    background-color: #ecf0f1;
+}
+
+.content-area {
+    flex: 1; /* 占据剩余空间 */
+    height: calc(100vh - 250px);
+    overflow-y: auto; /* 关键：让内容区可以独立滚动 */
+    padding-right: 10px; /* 留出滚动条空间 */
+}
+
+/* --- 科目子选项卡 --- */
+.subject-tab-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+    position: sticky; /* 让科目按钮在滚动时固定在顶部 */
+    top: 0;
+    background-color: #fff; /* 添加背景色防止下方内容透出 */
+    padding: 10px 0;
+    z-index: 20;
+}
+
+.subject-tab-buttons button {
+    background-color: #ecf0f1;
+    border: 1px solid #bdc3c7;
+    padding: 8px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.subject-tab-buttons button.active {
+    background-color: #3498db;
+    color: white;
+    border-color: #3498db;
+}
+
+.subject-pane {
+    display: none;
+}
+
+.subject-pane.active {
+    display: block;
+}
+
+/* --- 错题块样式 --- */
+.date-header {
+    margin-top: 30px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #3498db;
+    color: #2980b9;
+}
+.date-header:first-child {
+    margin-top: 0;
+}
+
+.question-block {
+    position: relative; /* 关键：为绝对定位的子元素提供参照物 */
+    background-color: #fdfdfd;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease;
+}
+
+.question-block:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+}
+
+.question-block h3 {
+    margin-top: 15px;
+    margin-bottom: 10px;
+    color: #34495e;
+    border-left: 4px solid #3498db;
+    padding-left: 10px;
+}
+.question-block h3:first-child {
+    margin-top: 0;
+}
+
+.question-block img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.question-block ul {
+    padding-left: 20px;
+}
+
+.question-block li {
+    margin-bottom: 5px;
+}
+
+.example {
+    background-color: #f9f9f9;
+    border: 1px dashed #ccc;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 4px;
+}
+
+/* --- 错题块动作选项卡样式 --- */
+.action-toolbar {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(40, 40, 40, 0.85);
+    backdrop-filter: blur(5px); /* 毛玻璃效果 */
+    border-radius: 20px;
+    padding: 5px;
+    display: flex;
+    gap: 5px;
+    opacity: 0; /* 默认隐藏 */
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    z-index: 10;
+}
+
+.question-block:hover .action-toolbar {
+    opacity: 1; /* 鼠标悬浮时显示 */
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.action-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.action-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: #e0e0e0;
+}
+
+/* 为AI解析和例题解答内容添加特定class，方便JS选择 */
+.ai-analysis-content, .similar-examples-content {
+    margin-top: 10px;
+}
+
+/* --- 上传错题页面样式 --- */
+#upload-form {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+}
+
+#upload-form div {
+    margin-bottom: 15px;
+}
+
+#upload-form label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+#upload-form input[type="text"],
+#upload-form textarea,
+#upload-form input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* 确保padding不会影响宽度 */
+}
+
+#upload-form textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+#upload-form button {
+    width: 100%;
+    padding: 12px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#upload-form button:hover {
+    background-color: #218838;
+}
+
+#upload-form button:disabled {
+    background-color: #aaa;
+    cursor: not-allowed;
+}
+
+#image-preview img {
+    max-width: 100%;
+    max-height: 300px;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#upload-status {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: bold;
+}
+
+#upload-status.success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+#upload-status.error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* --- 加载动画样式 --- */
+.loader {
+    text-align: center;
+    padding: 20px;
+    font-size: 16px;
+    color: #888;
+    display: none; /* 默认隐藏 */
+}
