@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错题本应用 - 部署指南与项目报告</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.7;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 30px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+        h1, h2, h3 {
+            color: #0056b3;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+        }
+        h2 {
+            font-size: 1.8em;
+            margin-top: 40px;
+        }
+        h3 {
+            font-size: 1.4em;
+            border-bottom: 1px solid #e9ecef;
+        }
+        code {
+            background-color: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.95em;
+        }
+        pre {
+            background-color: #2d333b;
+            color: #c9d1d9;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        ul, ol {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        strong {
+            color: #004085;
+        }
+        .section {
+            margin-bottom: 50px;
+        }
+        .note {
+            background-color: #e7f3ff;
+            border-left: 5px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>智能AI错题本应用</h1>
+
+        <!-- ================================================== -->
+        <!--                部署指南部分                        -->
+        <!-- ================================================== -->
+        <div class="section" id="deployment-guide">
+            <h2>部署指南</h2>
+            <p>本指南将引导您完成在本地计算机上成功部署和运行“智能AI错题本”应用的所有步骤。</p>
+
+            <h3>1. 环境要求</h3>
+            <p>在开始之前，请确保您的系统已安装以下软件：</p>
+            <ul>
+                <li><strong>Python 3.8 或更高版本</strong>：应用的核心后端语言。</li>
+                <li><strong>pip</strong>：Python的包管理器，通常随Python一起安装。</li>
+                <li>一个现代的网页浏览器（如 Chrome, Firefox, Edge）。</li>
+            </ul>
+
+            <h3>2. 部署步骤</h3>
+            <ol>
+                <li>
+                    <strong>获取项目文件</strong><br>
+                    将项目的所有文件（<code>app.py</code>, <code>core.py</code>, <code>database.py</code>, <code>.env</code>, <code>templates/</code>, <code>static/</code>）放置在一个独立的文件夹中，例如 <code>WrongAnswerBook</code>。
+                </li>
+                <li>
+                    <strong>创建并激活虚拟环境</strong><br>
+                    <p class="note"><strong>为什么需要虚拟环境？</strong> 它可以为项目创建一个隔离的Python环境，避免不同项目之间的库版本冲突，是Python开发的最佳实践。</p>
+                    打开终端（命令行工具），进入项目文件夹，并执行以下命令：
+                    <pre><code># 进入项目目录
+cd path/to/WrongAnswerBook
+
+# 创建虚拟环境 (Windows)
+python -m venv venv
+
+# 创建虚拟环境 (macOS/Linux)
+python3 -m venv venv
+
+# 激活虚拟环境 (Windows)
+.\venv\Scripts\activate
+
+# 激活虚拟环境 (macOS/Linux)
+source venv/bin/activate</code></pre>
+                    激活成功后，您会看到命令行提示符前面出现 <code>(venv)</code> 字样。
+                </li>
+                <li>
+                    <strong>安装项目依赖</strong><br>
+                    首先，在项目根目录下创建一个名为 <code>requirements.txt</code> 的文件，并填入以下内容：
+                    <pre><code>Flask
+python-dotenv
+openai
+markdown-it-py</code></pre>
+                    然后，在已激活虚拟环境的终端中运行以下命令来安装所有必需的库：
+                    <pre><code>pip install -r requirements.txt</code></pre>
+                </li>
+                <li>
+                    <strong>配置环境变量</strong><br>
+                    项目需要连接AI服务的API。请确保项目根目录下的 <code>.env</code> 文件内容正确，并填入您自己的API信息：
+                    <pre><code>AI_MODEL='gemini-2.5-flash-preview-05-20'
+API_URL="https://www.chataiapi.com/v1" 
+API_KEY="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" </code></pre>
+                    <p class="note"><strong>重要提示：</strong> 请将 <code>API_KEY</code> 替换为您自己的有效密钥。这是应用能够调用AI功能的核心。</p>
+                </li>
+                <li>
+                    <strong>运行应用</strong><br>
+                    所有准备工作就绪后，运行以下命令启动Web服务器：
+                    <pre><code>python app.py</code></pre>
+                    如果一切顺利，您将看到类似以下的输出，表明服务器已成功启动：
+                    <pre><code> * Serving Flask app 'app'
+ * Debug mode: on
+Database initialized and 'questions' table is ready.
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit</code></pre>
+                    <p class="note">首次运行时，程序会自动在项目根目录创建一个名为 <code>database.db</code> 的SQLite数据库文件。</p>
+                </li>
+                <li>
+                    <strong>访问应用</strong><br>
+                    打开您的网页浏览器，访问地址：<a href="http://127.0.0.1:5000">http://127.0.0.1:5000</a>。现在您应该可以看到应用的完整界面了。
+                </li>
+            </ol>
+        </div>
+
+        <!-- ================================================== -->
+        <!--                项目报告部分                        -->
+        <!-- ================================================== -->
+        <div class="section" id="project-report">
+            <h2>项目报告</h2>
+
+            <h3>1. 项目概述</h3>
+            <p>
+                本项目旨在开发一个基于Python和Web技术的“智能AI错题本”应用。它解决了传统错题整理方式效率低下、缺乏深度分析和个性化练习的问题。用户可以通过上传错题图片，获得由AI驱动的题目解析、考点分析、易错点提示和相似例题推荐。此外，应用还提供智能化的学习总结和数据可视化功能，帮助用户跟踪学习进度，发现知识薄弱环节。
+            </p>
+
+            <h3>2. 核心功能</h3>
+            <ul>
+                <li><strong>错题上传与管理</strong>：用户可以方便地上传错题图片，并按科目进行分类。</li>
+                <li><strong>AI智能分析</strong>：集成多模态AI模型，对图片中的题目进行深度分析，自动生成包括题目解析、考点归纳、易错点分析和相似例题在内的结构化数据。</li>
+                <li><strong>动态加载与无限滚动</strong>：采用懒加载技术，按需加载错题数据，实现了流畅的无限滚动浏览体验，有效解决了大数据量下的性能问题。</li>
+                <li><strong>交互式错题管理</strong>：每个错题块都提供悬浮工具栏，支持一键复制解析、删除记录以及重新生成AI解析等操作。</li>
+                <li><strong>每日智能总结</strong>：应用每日自动触发总结机制，利用AI对前一天的学习内容进行归纳，生成学习总纲和核心知识点报告。</li>
+                <li><strong>数据可视化</strong>：通过折线图和条形图，直观展示近7日的学习趋势和每日错题的科目分布，帮助用户量化学习成果。</li>
+            </ul>
+
+            <h3>3. 技术架构</h3>
+            <p>本应用采用前后端分离的经典Web架构，技术栈清晰，易于维护和扩展。</p>
+            <ul>
+                <li><strong>后端 (Backend)</strong>
+                    <ul>
+                        <li><strong>框架</strong>: <strong>Flask</strong>。一个轻量级的Python Web框架，提供了路由、模板渲染和请求处理等核心功能，非常适合快速开发。</li>
+                        <li><strong>核心逻辑 (<code>core.py</code>)</strong>: 负责与AI模型API进行交互，构建智能提示词（Prompt），处理图片编码，并解析AI返回的JSON数据。</li>
+                        <li><strong>数据库 (<code>database.py</code>)</strong>: 使用Python内置的 <strong>SQLite3</strong>，实现了数据的持久化存储。它无需额外配置，以单个文件的形式存在，非常适合单机应用。提供了增、删、改、查及分页查询的接口。</li>
+                        <li><strong>API服务 (<code>app.py</code>)</strong>: 作为应用的总控制器，定义了所有URL路由，包括页面渲染、文件上传、数据获取API（分页）和错题操作API（删除、重新生成）。</li>
+                    </ul>
+                </li>
+                <li><strong>前端 (Frontend)</strong>
+                    <ul>
+                        <li><strong>结构与模板</strong>: <strong>HTML5</strong> 与 <strong>Jinja2</strong> 模板引擎。Jinja2允许在HTML中嵌入Python逻辑，用于动态生成页面框架。</li>
+                        <li><strong>样式</strong>: <strong>CSS3</strong>。负责应用的整体布局、美化和响应式设计。</li>
+                        <li><strong>交互逻辑 (<code>main.js</code>)</strong>: 使用原生JavaScript (Vanilla JS) 和 <strong>Fetch API</strong>，实现了所有客户端的动态交互，包括：
+                            <ul>
+                                <li>选项卡切换。</li>
+                                <li>异步文件上传和图片预览。</li>
+                                <li>通过调用后端API实现错题的动态加载和无限滚动。</li>
+                                <li>错题操作（删除、复制等）的实时反馈。</li>
+                            </ul>
+                        </li>
+                        <li><strong>数据可视化</strong>: 集成 <strong>Chart.js</strong> 库，将后端传递的数据渲染成交互式的折线图和条形图。</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h3>4. 未来展望</h3>
+            <p>当前版本已具备核心功能，但仍有广阔的优化和扩展空间：</p>
+            <ul>
+                <li><strong>用户系统与多租户</strong>：引入用户注册和登录功能，使应用能够支持多用户，并保证数据隔离。</li>
+                <li><strong>高级搜索与筛选</strong>：增加按关键词、知识点或日期范围搜索错题的功能。</li>
+                <li><strong>在线编辑与标注</strong>：实现“修改解析”功能，允许用户直接在网页上编辑AI生成的解析，或对题目图片进行高亮标注。</li>
+                <li><strong>云端部署与数据同步</strong>：将应用部署到云服务器，并将数据库迁移到PostgreSQL等更强大的系统，实现数据云端同步，方便多设备访问。</li>
+                <li><strong>容器化部署</strong>：使用Docker对应用进行容器化，简化部署流程，提高环境一致性。</li>
+            </ul>
+
+            <h3>5. 总结</h3>
+            <p>
+                本项目成功地将现代AI技术与教育场景相结合，打造了一个高效、智能的个人学习工具。通过采用成熟的Web技术栈和优化的交互设计，应用不仅功能强大，而且性能优异，用户体验良好。它充分展示了如何通过技术创新来提升传统学习方法的效率和深度。
+            </p>
+        </div>
+
+    </div>
+
+</body>
+</html>
