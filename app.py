@@ -31,7 +31,7 @@ app.jinja_env.filters['markdown'] = markdown_filter
 # 在应用启动时，确保数据库和表已经创建好
 with app.app_context():
     database.init_db()
-
+    database.migrate_db()
 
 # --- 3. 路由和API端点 ---
 
@@ -39,21 +39,37 @@ with app.app_context():
 def index():
     """
     主页面路由。
-    负责渲染页面框架，并传递非错题数据（如总结、图表、科目列表）。
-    错题内容将由前端通过API动态加载。
+    (已重构为持久化每日总结)
     """
-    print("Loading main page shell...")
+    print("Loading main page...")
     
-    # --- 每日总结逻辑 ---
+    # --- 全新的每日总结逻辑 ---
     daily_summary = None
-    today_str = date.today().strftime("%Y-%m-%d")
-    latest_entry_date = database.get_latest_question_date()
+    yesterday_str = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # 触发条件：数据库有记录，且最新记录日期是昨天
-    if latest_entry_date and latest_entry_date == (date.today() - timedelta(days=1)).strftime("%Y-%m-%d"):
-        yesterday_str = latest_entry_date
+    # 1. 尝试从数据库读取昨天的总结
+    saved_summary = database.get_summary_by_date(yesterday_str)
+
+    if saved_summary:
+        print(f"Found saved summary for {yesterday_str} in database.")
+        # 2. 如果找到了，直接使用数据库中的数据
+        daily_summary = {
+            "date": saved_summary['summary_date'],
+            "ai_summary": {
+                "general_summary": saved_summary['general_summary'],
+                "knowledge_points_summary": json.loads(saved_summary['knowledge_points_summary'])
+            },
+            "question_count": saved_summary['question_count'],
+            "subject_chart_data": json.loads(saved_summary['subject_chart_data'])
+        }
+    else:
+        # 3. 如果数据库中没有，再检查昨天是否有错题记录，以决定是否需要生成
+        print(f"No saved summary for {yesterday_str}. Checking for yesterday's questions...")
         yesterday_questions = database.get_questions_by_date(yesterday_str)
+        
         if yesterday_questions:
+            print(f"Found {len(yesterday_questions)} questions from yesterday. Generating new summary...")
+            # 4. 只有在昨天确实有错题时，才调用AI生成并保存
             summary_text_list = []
             subjects_list = []
             for q in yesterday_questions:
@@ -65,6 +81,7 @@ def index():
             ai_summary_content = core.generate_daily_summary_with_ai("\n".join(summary_text_list))
             subject_counts = Counter(subjects_list)
             
+            # 组装成完整的总结数据结构
             daily_summary = {
                 "date": yesterday_str,
                 "ai_summary": ai_summary_content,
@@ -74,22 +91,24 @@ def index():
                     "data": list(subject_counts.values())
                 }
             }
+            
+            # 5. 将新生成的总结存入数据库，供今天后续访问使用
+            if 'error' not in ai_summary_content:
+                database.add_daily_summary(daily_summary)
+        else:
+            print("No questions from yesterday. No summary will be generated.")
 
-    # --- 周度图表逻辑 ---
+    # --- 周度图表逻辑 (保持不变) ---
     weekly_stats_raw = database.get_weekly_summary_stats()
     last_7_days = [(date.today() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
     stats_dict = {day: 0 for day in last_7_days}
     for row in weekly_stats_raw:
         stats_dict[row['entry_date']] = row['count']
-    
-    weekly_chart_data = {
-        "labels": list(stats_dict.keys()),
-        "data": list(stats_dict.values())
-    }
+    weekly_chart_data = { "labels": list(stats_dict.keys()), "data": list(stats_dict.values()) }
 
-    # --- 错题回顾的静态数据 ---
+    # --- 错题回顾的科目和时间线逻辑 (保持不变) ---
     subjects = database.get_all_subjects()
-    all_dates = database.get_all_question_dates() # 用于生成时间线
+    all_dates = database.get_all_question_dates()
     
     return render_template(
         'index.html', 

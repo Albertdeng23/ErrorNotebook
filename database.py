@@ -1,6 +1,6 @@
 import sqlite3
 import json
-
+from datetime import datetime
 # 定义数据库文件的名称
 DATABASE_NAME = "database.db"
 
@@ -31,6 +31,17 @@ def init_db():
                 knowledge_points TEXT,
                 ai_analysis TEXT, -- 存储“可能的错误”
                 similar_examples TEXT -- 存储“相似例题”
+            );
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS daily_summaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                summary_date TEXT NOT NULL UNIQUE,
+                general_summary TEXT,
+                knowledge_points_summary TEXT,
+                question_count INTEGER,
+                subject_chart_data TEXT,
+                created_at TEXT NOT NULL
             );
         """)
         conn.commit()
@@ -162,6 +173,63 @@ def get_weekly_summary_stats() -> list:
         """)
         return cursor.fetchall()
 
+# 在 database.py 文件末尾添加这个新函数
+
+def migrate_db():
+    """
+    检查并更新数据库表结构，以实现平滑升级。
+    """
+    print("Checking database schema...")
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # 1. 获取 'questions' 表的所有列信息
+        cursor.execute("PRAGMA table_info(questions)")
+        columns = [row['name'] for row in cursor.fetchall()]
+        
+        # 2. 检查 'user_question' 列是否存在
+        if 'user_question' not in columns:
+            try:
+                print("Column 'user_question' not found. Adding it now...")
+                # 使用 ALTER TABLE 添加新列，并设置一个默认值
+                cursor.execute("ALTER TABLE questions ADD COLUMN user_question TEXT DEFAULT ''")
+                conn.commit()
+                print("Successfully added 'user_question' column to the database.")
+            except sqlite3.Error as e:
+                print(f"Failed to add 'user_question' column. Error: {e}")
+        else:
+            print("Column 'user_question' already exists. No migration needed.")
+
+def add_daily_summary(summary_data: dict):
+    """将生成的每日总结存入数据库"""
+    sql = """
+        INSERT INTO daily_summaries (
+            summary_date, general_summary, knowledge_points_summary,
+            question_count, subject_chart_data, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?);
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(sql, (
+            summary_data['date'],
+            summary_data['ai_summary']['general_summary'],
+            json.dumps(summary_data['ai_summary']['knowledge_points_summary'], ensure_ascii=False),
+            summary_data['question_count'],
+            json.dumps(summary_data['subject_chart_data'], ensure_ascii=False),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+        conn.commit()
+        print(f"Saved daily summary for date: {summary_data['date']}")
+
+def get_summary_by_date(date_str: str):
+    """根据日期从数据库获取已保存的总结"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM daily_summaries WHERE summary_date = ?", (date_str,))
+        summary = cursor.fetchone()
+        return summary
+
+
 # --- 用于独立测试本模块功能的示例 ---
 if __name__ == '__main__':
     print("--- Running database module tests ---")
@@ -197,3 +265,4 @@ if __name__ == '__main__':
     assert latest_date == "2025-10-10"
 
     print("\n--- Database module tests completed successfully! ---")
+

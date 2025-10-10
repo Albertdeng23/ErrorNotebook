@@ -158,6 +158,7 @@ def process_new_question(image_bytes: bytes, subject: str, user_question: str = 
     final_data = {
         "original_image_b64": image_b64,
         "subject": subject,
+        "user_question": user_question,
         "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         # 将AI返回的几个部分分别存入对应字段
         "problem_analysis": ai_analysis_result.get("problem_analysis"),
@@ -171,15 +172,12 @@ def process_new_question(image_bytes: bytes, subject: str, user_question: str = 
 
 
 
+# 在 core.py 文件中
+
 def generate_daily_summary_with_ai(yesterday_questions_text: str) -> dict:
     """
     调用AI模型对昨日学习内容进行总结。
-
-    Args:
-        yesterday_questions_text: 拼接了昨日所有错题解析和考点的长字符串。
-
-    Returns:
-        包含总结内容的字典。
+    (增强了JSON解析的健壮性和回退机制)
     """
     if not client:
         return {"error": "AI client is not initialized."}
@@ -192,7 +190,7 @@ def generate_daily_summary_with_ai(yesterday_questions_text: str) -> dict:
     {yesterday_questions_text}
     ---
 
-    请严格按照以下JSON格式返回你的总结报告，不要添加任何额外的解释：
+    请严格按照以下JSON格式返回你的总结报告，不要添加任何额外的解释或文字包裹。你的回答必须是一个完整的、可以被直接解析的JSON对象。
     {{
       "general_summary": "在这里用2-3句话对昨日学习的整体内容进行一个高度概括的总结（总纲）。",
       "knowledge_points_summary": [
@@ -215,20 +213,42 @@ def generate_daily_summary_with_ai(yesterday_questions_text: str) -> dict:
         
         ai_result_str = response.choices[0].message.content
         
+        # --- 新增：防御性解析逻辑 ---
         try:
-            ai_result_json = json.loads(ai_result_str)
+            # 1. 尝试找到JSON对象的开始和结束位置
+            start_index = ai_result_str.find('{')
+            end_index = ai_result_str.rfind('}')
+            
+            if start_index != -1 and end_index != -1 and end_index > start_index:
+                # 2. 提取可能的JSON字符串
+                json_candidate_str = ai_result_str[start_index : end_index + 1]
+                ai_result_json = json.loads(json_candidate_str)
+                print("Successfully parsed extracted JSON.")
+                
+                # 成功解析，返回结构化数据
+                return {
+                    "general_summary": ai_result_json.get("general_summary", "AI未提供总纲。"),
+                    "knowledge_points_summary": ai_result_json.get("knowledge_points_summary", ["AI未能总结知识点。"])
+                }
+            else:
+                # 如果连 '{' 和 '}' 都找不到，直接进入降级处理
+                raise ValueError("JSON object markers not found in the response.")
+
+        except (json.JSONDecodeError, ValueError) as e:
+            # 3. 如果解析失败，执行优雅降级
+            print(f"JSON parsing failed: {e}. Falling back to unstructured summary.")
+            # 返回一个非错误格式的字典，但内容是原始文本
+            # 这样可以被存入数据库，避免重复调用
             return {
-                "general_summary": ai_result_json.get("general_summary", "AI未能生成总纲。"),
-                "knowledge_points_summary": ai_result_json.get("knowledge_points_summary", ["AI未能总结知识点。"])
+                "general_summary": f"[非结构化总结] {ai_result_str}",
+                "knowledge_points_summary": ["AI返回的知识点无法按格式解析，请参考上方总纲。"]
             }
-        except json.JSONDecodeError:
-            error_message = f"AI返回的总结不是有效的JSON格式。原始响应: '{ai_result_str[:200]}...'"
-            print(error_message)
-            return {"error": error_message}
+        # --- 防御性解析结束 ---
 
     except Exception as e:
         print(f"An error occurred during AI summary generation: {e}")
         return {"error": str(e)}
+
 
 
 # --- 这是一个用于独立测试本模块功能的示例 ---
