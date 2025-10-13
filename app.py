@@ -35,69 +35,15 @@ with app.app_context():
 
 # --- 3. 路由和API端点 ---
 
+# in app.py
 @app.route('/')
 def index():
     """
     主页面路由。
-    (已重构为持久化每日总结)
+    (已简化，不再处理每日总结，只渲染页面框架)
     """
-    print("Loading main page...")
+    print("Loading main page shell...")
     
-    # --- 全新的每日总结逻辑 ---
-    daily_summary = None
-    yesterday_str = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    # 1. 尝试从数据库读取昨天的总结
-    saved_summary = database.get_summary_by_date(yesterday_str)
-
-    if saved_summary:
-        print(f"Found saved summary for {yesterday_str} in database.")
-        # 2. 如果找到了，直接使用数据库中的数据
-        daily_summary = {
-            "date": saved_summary['summary_date'],
-            "ai_summary": {
-                "general_summary": saved_summary['general_summary'],
-                "knowledge_points_summary": json.loads(saved_summary['knowledge_points_summary'])
-            },
-            "question_count": saved_summary['question_count'],
-            "subject_chart_data": json.loads(saved_summary['subject_chart_data'])
-        }
-    else:
-        # 3. 如果数据库中没有，再检查昨天是否有错题记录，以决定是否需要生成
-        print(f"No saved summary for {yesterday_str}. Checking for yesterday's questions...")
-        yesterday_questions = database.get_questions_by_date(yesterday_str)
-        
-        if yesterday_questions:
-            print(f"Found {len(yesterday_questions)} questions from yesterday. Generating new summary...")
-            # 4. 只有在昨天确实有错题时，才调用AI生成并保存
-            summary_text_list = []
-            subjects_list = []
-            for q in yesterday_questions:
-                summary_text_list.append(q['problem_analysis'])
-                k_points = json.loads(q['knowledge_points'])
-                summary_text_list.extend(k_points)
-                subjects_list.append(q['subject'])
-            
-            ai_summary_content = core.generate_daily_summary_with_ai("\n".join(summary_text_list))
-            subject_counts = Counter(subjects_list)
-            
-            # 组装成完整的总结数据结构
-            daily_summary = {
-                "date": yesterday_str,
-                "ai_summary": ai_summary_content,
-                "question_count": len(yesterday_questions),
-                "subject_chart_data": {
-                    "labels": list(subject_counts.keys()),
-                    "data": list(subject_counts.values())
-                }
-            }
-            
-            # 5. 将新生成的总结存入数据库，供今天后续访问使用
-            if 'error' not in ai_summary_content:
-                database.add_daily_summary(daily_summary)
-        else:
-            print("No questions from yesterday. No summary will be generated.")
-
     # --- 周度图表逻辑 (保持不变) ---
     weekly_stats_raw = database.get_weekly_summary_stats()
     last_7_days = [(date.today() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
@@ -114,9 +60,9 @@ def index():
         'index.html', 
         subjects=subjects, 
         all_dates=all_dates,
-        daily_summary=daily_summary,
         weekly_chart_data=weekly_chart_data
     )
+
 
 
 @app.route('/get-questions')
@@ -233,6 +179,61 @@ def regenerate_analysis(question_id):
     except Exception as e:
         print(f"Error regenerating analysis for {question_id}: {e}")
         return jsonify({'status': 'failed', 'message': f'重新生成失败: {e}'}), 500
+
+
+# in app.py
+@app.route('/get-summary/<string:date_str>')
+def get_summary(date_str):
+    """
+    根据指定日期获取或生成每日总结。
+    """
+    print(f"Request received for summary of date: {date_str}")
+    
+    # 1. 尝试从数据库读取该日期的总结
+    saved_summary = database.get_summary_by_date(date_str)
+    if saved_summary:
+        print(f"Found saved summary for {date_str} in database.")
+        daily_summary = {
+            "date": saved_summary['summary_date'],
+            "ai_summary": {
+                "general_summary": saved_summary['general_summary'],
+                "knowledge_points_summary": json.loads(saved_summary['knowledge_points_summary'])
+            },
+            "question_count": saved_summary['question_count'],
+            "subject_chart_data": json.loads(saved_summary['subject_chart_data'])
+        }
+        return jsonify(daily_summary)
+
+    # 2. 如果数据库中没有，则尝试生成
+    print(f"No saved summary for {date_str}. Trying to generate one...")
+    questions_for_date = database.get_questions_by_date(date_str)
+    
+    if not questions_for_date:
+        print(f"No questions found for {date_str}. Cannot generate summary.")
+        return jsonify({"message": f"日期 {date_str} 没有错题记录，无法生成总结。"}), 404
+
+    # 3. 如果当天有错题，则生成、保存并返回总结
+    print(f"Found {len(questions_for_date)} questions for {date_str}. Generating new summary...")
+    summary_text_list = [q['problem_analysis'] for q in questions_for_date]
+    subjects_list = [q['subject'] for q in questions_for_date]
+    
+    ai_summary_content = core.generate_daily_summary_with_ai("\n".join(summary_text_list))
+    subject_counts = Counter(subjects_list)
+    
+    daily_summary = {
+        "date": date_str,
+        "ai_summary": ai_summary_content,
+        "question_count": len(questions_for_date),
+        "subject_chart_data": {
+            "labels": list(subject_counts.keys()),
+            "data": list(subject_counts.values())
+        }
+    }
+    
+    if 'error' not in ai_summary_content:
+        database.add_daily_summary(daily_summary)
+    
+    return jsonify(daily_summary)
 
 
 # --- 4. 启动应用 ---
