@@ -7,6 +7,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const monthYearEl = document.getElementById('month-year');
     const prevMonthBtn = document.getElementById('prev-month');
     const nextMonthBtn = document.getElementById('next-month');
+    // 新增：获取搜索框元素
+    const searchInput = document.getElementById('search-input');
+    const searchButton = document.getElementById('search-button');
+    const clearSearchButton = document.getElementById('clear-search-button');
     
     // allDatesWithRecords 变量由后端在HTML模板中注入
     let currentDate = new Date();
