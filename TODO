@@ -1,3 +1,18 @@
 改版主界面，使得有昨日总结  ✔
 将日期选择跟换位日历表
 滚动刷新机制               ✔
+
+
+[Unit]
+Description=Gunicorn instance to serve WrongAnswerBook
+After=network.target
+
+[Service]
+User=issic  # <-- 修改为您的 Ubuntu 用户名 (例如 ubuntu, root, 或您自己的用户名)
+Group=www-data
+WorkingDirectory=/home/ErrorNotebook # <-- 修改为您的项目完整路径
+Environment="PATH=/home/ErrorNotebook/venv/bin" # <-- 修改为虚拟环境的路径
+ExecStart=/home/ubuntu/WrongAnswerBook/venv/bin/gunicorn --workers 3 --bind unix:wrongbook.sock -m 007 app:app
+
+[Install]
+WantedBy=multi-user.target
