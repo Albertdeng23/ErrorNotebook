@@ -267,6 +267,29 @@ def get_summary_by_date(date_str: str):
         summary = cursor.fetchone()
         return summary
 
+def get_careless_mistake_by_id(mistake_id: int):
+    """根据ID获取一条粗心错误记录。"""
+    with get_db_connection() as conn:
+        mistake = conn.execute('SELECT * FROM careless_mistakes WHERE id = ?', (mistake_id,)).fetchone()
+        return mistake
+
+def update_careless_mistake(mistake_id: int, new_reflection: str):
+    """根据ID更新一条粗心错误记录的反思内容。"""
+    with get_db_connection() as conn:
+        conn.execute(
+            'UPDATE careless_mistakes SET user_reflection = ? WHERE id = ?',
+            (new_reflection, mistake_id)
+        )
+        conn.commit()
+        print(f"Updated careless mistake with ID: {mistake_id}")
+
+def delete_careless_mistake(mistake_id: int):
+    """根据ID删除一条粗心错误记录。"""
+    with get_db_connection() as conn:
+        conn.execute('DELETE FROM careless_mistakes WHERE id = ?', (mistake_id,))
+        conn.commit()
+        print(f"Deleted careless mistake with ID: {mistake_id}")
+
 
 # --- 用于独立测试本模块功能的示例 ---
 if __name__ == '__main__':

@@ -285,6 +285,37 @@ def get_careless_mistakes():
         print(f"Error in /get-careless-mistakes: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
+@app.route('/update-careless-mistake/<int:mistake_id>', methods=['POST'])
+def update_careless_mistake(mistake_id):
+    """处理更新粗心错误反思的API端点。"""
+    try:
+        new_reflection = request.form.get('user_reflection')
+        if new_reflection is None:
+            return jsonify({'status': 'failed', 'message': '缺少反思内容'}), 400
+        
+        database.update_careless_mistake(mistake_id, new_reflection)
+        
+        # 返回更新后的内容，方便前端直接渲染
+        return jsonify({
+            'status': 'success', 
+            'message': '反思已更新', 
+            'new_reflection': new_reflection
+        })
+    except Exception as e:
+        print(f"Error updating careless mistake {mistake_id}: {e}")
+        return jsonify({'status': 'failed', 'message': f'更新失败: {e}'}), 500
+
+
+@app.route('/delete-careless-mistake/<int:mistake_id>', methods=['DELETE'])
+def delete_careless_mistake(mistake_id):
+    """处理删除粗心错误的API端点。"""
+    try:
+        database.delete_careless_mistake(mistake_id)
+        return jsonify({'status': 'success', 'message': '记录已删除'}), 200
+    except Exception as e:
+        print(f"Error deleting careless mistake {mistake_id}: {e}")
+        return jsonify({'status': 'failed', 'message': f'删除失败: {e}'}), 500
+
 # --- 4. 启动应用 ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

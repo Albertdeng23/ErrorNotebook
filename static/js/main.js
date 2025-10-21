@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===================================================================
     // SECTION 3: UPLOAD FORM LOGIC
     // ===================================================================
-// --- 3.1 【新增】初始化富文本编辑器 ---
+    // --- 3.1 初始化富文本编辑器 ---
     tinymce.init({
         selector: '#reflection-editor',
         plugins: 'lists link image table code help wordcount',
@@ -308,66 +308,118 @@ document.addEventListener('DOMContentLoaded', function() {
         placeholder: '在这里详细记录你的反思：是哪里看错了？哪个公式用混了？还是计算步骤跳步了？...'
     });
 
-    // --- 3.2 【新增】上传区域的子选项卡切换逻辑 ---
+    // --- 3.2 上传区域的子选项卡切换逻辑 (带状态重置) ---
     const uploadSubTabs = document.querySelectorAll('.upload-sub-tabs .subject-btn');
     const uploadPanes = document.querySelectorAll('.upload-pane');
+    const aiForm = document.getElementById('upload-form');
+    const carelessForm = document.getElementById('careless-upload-form');
+
     uploadSubTabs.forEach(btn => {
         btn.addEventListener('click', () => {
+            // 切换激活状态
             uploadSubTabs.forEach(b => b.classList.remove('active'));
             uploadPanes.forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById(btn.dataset.subTab).classList.add('active');
+
+            // 【UX优化】清空非激活选项卡的状态
+            if (btn.dataset.subTab === 'ai-upload') {
+                // 如果切换到AI上传，清空粗心上传表单
+                carelessForm.reset();
+                carelessForm.querySelector('#careless-image-preview').innerHTML = '';
+                carelessForm.querySelector('#careless-upload-status').innerHTML = '';
+            } else {
+                // 如果切换到粗心上传，清空AI上传表单
+                aiForm.reset();
+                aiForm.querySelector('#image-preview').innerHTML = '';
+                aiForm.querySelector('#upload-status').innerHTML = '';
+            }
         });
     });
 
-    // --- 3.3 原有的AI分析上传逻辑 ---
-    const uploadForm = document.getElementById('upload-form');
-    if (uploadForm) {
-        // ... (这部分逻辑完全不变, 但注意选择器要精确) ...
-        const imageInput = uploadForm.querySelector('#question_image');
-        const imagePreview = uploadForm.querySelector('#image-preview');
-        const submitBtn = uploadForm.querySelector('#submit-btn');
-        const uploadStatus = uploadForm.querySelector('#upload-status');
+    // --- 3.3 AI智能分析上传逻辑 (独立作用域) ---
+    if (aiForm) {
+        const aiImageInput = aiForm.querySelector('#question_image');
+        const aiImagePreview = aiForm.querySelector('#image-preview');
+        const aiSubmitBtn = aiForm.querySelector('#submit-btn');
+        const aiUploadStatus = aiForm.querySelector('#upload-status');
 
-        imageInput.addEventListener('change', function() { /* ... 不变 ... */ });
-        uploadForm.addEventListener('submit', function(event) { /* ... 不变 ... */ });
-    }
-
-    // --- 3.4 【新增】粗心反思上传逻辑 ---
-    const carelessUploadForm = document.getElementById('careless-upload-form');
-    if (carelessUploadForm) {
-        const imageInput = carelessUploadForm.querySelector('#careless_question_image');
-        const imagePreview = carelessUploadForm.querySelector('#careless-image-preview');
-        const submitBtn = carelessUploadForm.querySelector('#careless-submit-btn');
-        const uploadStatus = carelessUploadForm.querySelector('#careless-upload-status');
-
-        imageInput.addEventListener('change', function() {
-            imagePreview.innerHTML = '';
+        aiImageInput.addEventListener('change', function() {
+            aiImagePreview.innerHTML = '';
             const file = this.files[0];
             if (file) {
                 const reader = new FileReader();
-                reader.onload = (e) => { const img = document.createElement('img'); img.src = e.target.result; imagePreview.appendChild(img); }
+                reader.onload = (e) => {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    aiImagePreview.appendChild(img);
+                }
                 reader.readAsDataURL(file);
             }
         });
 
-        carelessUploadForm.addEventListener('submit', function(event) {
+        aiForm.addEventListener('submit', function(event) {
             event.preventDefault();
-            
-            // 关键：从TinyMCE获取内容
+            aiSubmitBtn.disabled = true;
+            aiSubmitBtn.textContent = '正在分析中...';
+            aiUploadStatus.innerHTML = '';
+            aiUploadStatus.className = '';
+            fetch('/upload', { method: 'POST', body: new FormData(aiForm) })
+            .then(response => {
+                if (!response.ok) return response.json().then(err => { throw new Error(err.message) });
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    aiUploadStatus.textContent = data.message + ' 页面即将刷新...';
+                    aiUploadStatus.classList.add('success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else { throw new Error(data.message); }
+            })
+            .catch(error => {
+                aiUploadStatus.textContent = '上传失败：' + error.message;
+                aiUploadStatus.classList.add('error');
+                aiSubmitBtn.disabled = false;
+                aiSubmitBtn.textContent = '上传并分析';
+            });
+        });
+    }
+
+    // --- 3.4 粗心反思上传逻辑 (独立作用域) ---
+    if (carelessForm) {
+        const carelessImageInput = carelessForm.querySelector('#careless_question_image');
+        const carelessImagePreview = carelessForm.querySelector('#careless-image-preview');
+        const carelessSubmitBtn = carelessForm.querySelector('#careless-submit-btn');
+        const carelessUploadStatus = carelessForm.querySelector('#careless-upload-status');
+
+        carelessImageInput.addEventListener('change', function() {
+            carelessImagePreview.innerHTML = '';
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    carelessImagePreview.appendChild(img);
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        carelessForm.addEventListener('submit', function(event) {
+            event.preventDefault();
             const reflectionContent = tinymce.get('reflection-editor').getContent();
             if (!reflectionContent.trim()) {
                 alert('请填写你的反思内容！');
                 return;
             }
 
-            submitBtn.disabled = true;
-            submitBtn.textContent = '正在保存...';
-            uploadStatus.innerHTML = '';
-            uploadStatus.className = '';
+            carelessSubmitBtn.disabled = true;
+            carelessSubmitBtn.textContent = '正在保存...';
+            carelessUploadStatus.innerHTML = '';
+            carelessUploadStatus.className = '';
 
-            const formData = new FormData(carelessUploadForm);
-            // 将编辑器内容添加到表单数据中
+            const formData = new FormData(carelessForm);
             formData.append('user_reflection', reflectionContent);
 
             fetch('/upload-careless-mistake', { method: 'POST', body: formData })
@@ -377,16 +429,16 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(data => {
                 if (data.status === 'success') {
-                    uploadStatus.textContent = data.message + ' 页面即将刷新...';
-                    uploadStatus.classList.add('success');
+                    carelessUploadStatus.textContent = data.message + ' 页面即将刷新...';
+                    carelessUploadStatus.classList.add('success');
                     setTimeout(() => window.location.reload(), 2000);
                 } else { throw new Error(data.message); }
             })
             .catch(error => {
-                uploadStatus.textContent = '保存失败：' + error.message;
-                uploadStatus.classList.add('error');
-                submitBtn.disabled = false;
-                submitBtn.textContent = '保存我的反思';
+                carelessUploadStatus.textContent = '保存失败：' + error.message;
+                carelessUploadStatus.classList.add('error');
+                carelessSubmitBtn.disabled = false;
+                carelessSubmitBtn.textContent = '保存我的反思';
             });
         });
     }
@@ -394,19 +446,35 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===================================================================
     // SECTION 4: ACTION BUTTONS LOGIC (EVENT DELEGATION)
     // ===================================================================
-    const reviewTab = document.getElementById('review-tab');
-    if (reviewTab) {
-        reviewTab.addEventListener('click', function(event) {
+    const tabContent = document.querySelector('.tab-content');
+    if (tabContent) {
+        tabContent.addEventListener('click', function(event) {
             const actionBtn = event.target.closest('.action-btn');
             if (!actionBtn) return;
+
             const action = actionBtn.dataset.action;
+            
+            // AI错题回顾的操作
             const questionBlock = actionBtn.closest('.question-block');
-            const questionId = questionBlock.dataset.questionId;
-            switch (action) {
-                case 'delete': handleDelete(questionId, questionBlock); break;
-                case 'copy': handleCopy(questionId, actionBtn); break;
-                case 'regenerate': handleRegenerate(questionId, questionBlock); break;
-                case 'edit': alert('修改功能正在开发中！'); break;
+            if (questionBlock && questionBlock.dataset.questionId) {
+                const questionId = questionBlock.dataset.questionId;
+                switch (action) {
+                    case 'delete': handleDelete(questionId, questionBlock); break;
+                    case 'copy': handleCopy(questionId, actionBtn); break;
+                    case 'regenerate': handleRegenerate(questionId, questionBlock); break;
+                    case 'edit': alert('修改功能正在开发中！'); break;
+                }
+            }
+
+            // 【新增】粗心错误记录的操作
+            const mistakeBlock = actionBtn.closest('.careless-mistake-block');
+            if (mistakeBlock && mistakeBlock.dataset.mistakeId) {
+                const mistakeId = mistakeBlock.dataset.mistakeId;
+                switch (action) {
+                    case 'edit-careless': handleEditCareless(mistakeId, mistakeBlock); break;
+                    case 'copy-careless': handleCopyCareless(mistakeId, actionBtn); break;
+                    case 'delete-careless': handleDeleteCareless(mistakeId, mistakeBlock); break;
+                }
             }
         });
     }
@@ -519,8 +587,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderCarelessMistakes(mistakes, container) {
         let html = '';
         mistakes.forEach(m => {
+            // 【修改】添加了 action-toolbar div
             html += `
             <div class="question-block careless-mistake-block" data-mistake-id="${m.id}">
+                <div class="action-toolbar">
+                    <button class="action-btn" data-action="edit-careless" title="编辑反思"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
+                    <button class="action-btn" data-action="copy-careless" title="复制反思内容"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                    <button class="action-btn" data-action="delete-careless" title="删除本条记录"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+                </div>
                 <div class="date-header-inline">${m.upload_date.split(' ')[0]}</div>
                 <h3>原题图片</h3>
                 <img src="data:image/jpeg;base64,${m.original_image_b64}" alt="错题图片">
@@ -535,3 +609,108 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 });
+
+function handleDeleteCareless(id, element) {
+    if (confirm('确定要删除这条记录吗？此操作不可撤销。')) {
+        fetch(`/delete-careless-mistake/${id}`, { method: 'DELETE' })
+        .then(response => {
+            if (response.ok) {
+                element.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                element.style.opacity = '0';
+                element.style.transform = 'scale(0.95)';
+                setTimeout(() => element.remove(), 500);
+            } else { alert('删除失败，请稍后再试。'); }
+        })
+        .catch(error => { console.error('Error:', error); alert('删除时发生网络错误。'); });
+    }
+}
+
+function handleCopyCareless(id, button) {
+    const mBlock = document.querySelector(`.careless-mistake-block[data-mistake-id="${id}"]`);
+    const reflectionDiv = mBlock.querySelector('.user-reflection-content');
+    // 使用 innerText 获取纯文本内容，去除HTML标签
+    const textToCopy = reflectionDiv.innerText; 
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        const originalIcon = button.innerHTML;
+        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+        setTimeout(() => { button.innerHTML = originalIcon; }, 1500);
+    }).catch(err => { console.error('Copy failed', err); alert('复制失败！'); });
+}
+
+function handleEditCareless(id, element) {
+    const reflectionContainer = element.querySelector('.user-reflection-content');
+    // 防止重复点击
+    if (element.classList.contains('is-editing')) return;
+    element.classList.add('is-editing');
+
+    const originalHtml = reflectionContainer.innerHTML;
+    const editorId = `editor-${id}`;
+
+    // 1. 创建编辑器和按钮的HTML结构
+    reflectionContainer.innerHTML = `
+        <textarea id="${editorId}"></textarea>
+        <div class="edit-controls">
+            <button class="btn-save">保存</button>
+            <button class="btn-cancel">取消</button>
+        </div>
+    `;
+
+    // 2. 初始化 TinyMCE 编辑器
+    tinymce.init({
+        selector: `#${editorId}`,
+        height: 250,
+        menubar: false,
+        plugins: 'lists link image table code help wordcount',
+        toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright | bullist numlist',
+        setup: function(editor) {
+            // 编辑器初始化完成后，填入原始内容
+            editor.on('init', function() {
+                editor.setContent(originalHtml);
+            });
+        }
+    });
+
+    // 3. 绑定保存和取消按钮的事件
+    const btnSave = reflectionContainer.querySelector('.btn-save');
+    const btnCancel = reflectionContainer.querySelector('.btn-cancel');
+
+    btnSave.addEventListener('click', () => {
+        const newContent = tinymce.get(editorId).getContent();
+        const formData = new FormData();
+        formData.append('user_reflection', newContent);
+
+        btnSave.textContent = '保存中...';
+        btnSave.disabled = true;
+
+        fetch(`/update-careless-mistake/${id}`, { method: 'POST', body: formData })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // 销毁编辑器实例
+                tinymce.get(editorId).remove();
+                // 更新为静态内容
+                reflectionContainer.innerHTML = data.new_reflection;
+                element.classList.remove('is-editing');
+            } else {
+                alert('保存失败: ' + data.message);
+                btnSave.textContent = '保存';
+                btnSave.disabled = false;
+            }
+        })
+        .catch(err => {
+            console.error('Save error:', err);
+            alert('保存时发生网络错误。');
+            btnSave.textContent = '保存';
+            btnSave.disabled = false;
+        });
+    });
+
+    btnCancel.addEventListener('click', () => {
+        // 销毁编辑器实例
+        tinymce.get(editorId).remove();
+        // 恢复原始内容
+        reflectionContainer.innerHTML = originalHtml;
+        element.classList.remove('is-editing');
+    });
+}
