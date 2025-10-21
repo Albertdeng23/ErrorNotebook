@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // SECTION 1: CORE LOADING & TAB LOGIC
     // ===================================================================
 
-    // --- 1.1. 主选项卡切换 ---
+// --- 1.1. 主选项卡切换 (稍作修改以支持新面板) ---
     const mainTabBtns = document.querySelectorAll('.tab-btn');
     const mainTabPanes = document.querySelectorAll('.tab-pane');
     mainTabBtns.forEach(btn => {
@@ -113,7 +113,13 @@ document.addEventListener('DOMContentLoaded', function() {
             mainTabBtns.forEach(b => b.classList.remove('active'));
             mainTabPanes.forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
+            const activePane = document.getElementById(btn.dataset.tab);
+            activePane.classList.add('active');
+
+            // 【新增】如果点击的是“计算错误”选项卡，且内容为空，则加载数据
+            if (btn.dataset.tab === 'careless-mistake-tab' && activePane.querySelector('.careless-mistake-list').children.length === 0) {
+                loadCarelessMistakes();
+            }
         });
     });
 
@@ -138,15 +144,29 @@ document.addEventListener('DOMContentLoaded', function() {
     loadQuestionsForActiveSubject();
 
     // --- 1.4. 无限滚动加载 ---
-    const contentArea = document.querySelector('.content-area');
-    if (contentArea) {
-        contentArea.addEventListener('scroll', () => {
-            const activePane = document.querySelector('.subject-pane.active');
-            if (!activePane) return;
-            const isLoading = activePane.dataset.isLoading === 'true';
-            const hasMore = activePane.dataset.hasMore === 'true';
-            if (hasMore && !isLoading && contentArea.scrollTop + contentArea.clientHeight >= contentArea.scrollHeight - 200) {
-                loadQuestionsForActiveSubject();
+    // --- 1.4. 无限滚动加载 (稍作修改以支持新面板) ---
+    const mainContentArea = document.querySelector('.tab-content'); // 监听更大的容器
+    if (mainContentArea) {
+        mainContentArea.addEventListener('scroll', () => {
+            // 错题回顾的滚动
+            const activeReviewPane = document.querySelector('.subject-pane.active');
+            const contentArea = document.querySelector('.content-area');
+            if (activeReviewPane && contentArea) {
+                const isLoading = activeReviewPane.dataset.isLoading === 'true';
+                const hasMore = activeReviewPane.dataset.hasMore === 'true';
+                if (hasMore && !isLoading && contentArea.scrollTop + contentArea.clientHeight >= contentArea.scrollHeight - 200) {
+                    loadQuestionsForActiveSubject();
+                }
+            }
+
+            // 【新增】计算错误面板的滚动
+            const activeCarelessPane = document.querySelector('#careless-mistake-tab.active');
+            if (activeCarelessPane) {
+                const isLoading = activeCarelessPane.dataset.isLoading === 'true';
+                const hasMore = activeCarelessPane.dataset.hasMore === 'true';
+                if (hasMore && !isLoading && activeCarelessPane.scrollTop + activeCarelessPane.clientHeight >= activeCarelessPane.scrollHeight - 100) {
+                    loadCarelessMistakes();
+                }
             }
         });
     }
@@ -278,12 +298,48 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===================================================================
     // SECTION 3: UPLOAD FORM LOGIC
     // ===================================================================
+// --- 3.1 【新增】初始化富文本编辑器 ---
+    tinymce.init({
+        selector: '#reflection-editor',
+        plugins: 'lists link image table code help wordcount',
+        toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright | bullist numlist outdent indent | link image | code',
+        height: 300,
+        menubar: false,
+        placeholder: '在这里详细记录你的反思：是哪里看错了？哪个公式用混了？还是计算步骤跳步了？...'
+    });
+
+    // --- 3.2 【新增】上传区域的子选项卡切换逻辑 ---
+    const uploadSubTabs = document.querySelectorAll('.upload-sub-tabs .subject-btn');
+    const uploadPanes = document.querySelectorAll('.upload-pane');
+    uploadSubTabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            uploadSubTabs.forEach(b => b.classList.remove('active'));
+            uploadPanes.forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.subTab).classList.add('active');
+        });
+    });
+
+    // --- 3.3 原有的AI分析上传逻辑 ---
     const uploadForm = document.getElementById('upload-form');
     if (uploadForm) {
-        const imageInput = document.getElementById('question_image');
-        const imagePreview = document.getElementById('image-preview');
-        const submitBtn = document.getElementById('submit-btn');
-        const uploadStatus = document.getElementById('upload-status');
+        // ... (这部分逻辑完全不变, 但注意选择器要精确) ...
+        const imageInput = uploadForm.querySelector('#question_image');
+        const imagePreview = uploadForm.querySelector('#image-preview');
+        const submitBtn = uploadForm.querySelector('#submit-btn');
+        const uploadStatus = uploadForm.querySelector('#upload-status');
+
+        imageInput.addEventListener('change', function() { /* ... 不变 ... */ });
+        uploadForm.addEventListener('submit', function(event) { /* ... 不变 ... */ });
+    }
+
+    // --- 3.4 【新增】粗心反思上传逻辑 ---
+    const carelessUploadForm = document.getElementById('careless-upload-form');
+    if (carelessUploadForm) {
+        const imageInput = carelessUploadForm.querySelector('#careless_question_image');
+        const imagePreview = carelessUploadForm.querySelector('#careless-image-preview');
+        const submitBtn = carelessUploadForm.querySelector('#careless-submit-btn');
+        const uploadStatus = carelessUploadForm.querySelector('#careless-upload-status');
 
         imageInput.addEventListener('change', function() {
             imagePreview.innerHTML = '';
@@ -295,13 +351,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        uploadForm.addEventListener('submit', function(event) {
+        carelessUploadForm.addEventListener('submit', function(event) {
             event.preventDefault();
+            
+            // 关键：从TinyMCE获取内容
+            const reflectionContent = tinymce.get('reflection-editor').getContent();
+            if (!reflectionContent.trim()) {
+                alert('请填写你的反思内容！');
+                return;
+            }
+
             submitBtn.disabled = true;
-            submitBtn.textContent = '正在分析中...';
+            submitBtn.textContent = '正在保存...';
             uploadStatus.innerHTML = '';
             uploadStatus.className = '';
-            fetch('/upload', { method: 'POST', body: new FormData(uploadForm) })
+
+            const formData = new FormData(carelessUploadForm);
+            // 将编辑器内容添加到表单数据中
+            formData.append('user_reflection', reflectionContent);
+
+            fetch('/upload-careless-mistake', { method: 'POST', body: formData })
             .then(response => {
                 if (!response.ok) return response.json().then(err => { throw new Error(err.message) });
                 return response.json();
@@ -314,10 +383,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else { throw new Error(data.message); }
             })
             .catch(error => {
-                uploadStatus.textContent = '上传失败：' + error.message;
+                uploadStatus.textContent = '保存失败：' + error.message;
                 uploadStatus.classList.add('error');
                 submitBtn.disabled = false;
-                submitBtn.textContent = '上传并分析';
+                submitBtn.textContent = '保存我的反思';
             });
         });
     }
@@ -410,5 +479,59 @@ document.addEventListener('DOMContentLoaded', function() {
             options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
         });
     }
+
+    // ===================================================================
+    // 【新增】SECTION 6: CARELESS MISTAKE LOGIC
+    // ===================================================================
+    function loadCarelessMistakes() {
+        const container = document.querySelector('#careless-mistake-tab');
+        if (!container || container.dataset.isLoading === 'true' || container.dataset.hasMore === 'false') return;
+
+        let page = parseInt(container.dataset.page, 10);
+        container.dataset.isLoading = 'true';
+        const loader = container.querySelector('.loader');
+        if (loader) loader.style.display = 'block';
+
+        fetch(`/get-careless-mistakes?page=${page}`)
+            .then(response => response.json())
+            .then(mistakes => {
+                if (loader) loader.style.display = 'none';
+                if (mistakes.length > 0) {
+                    renderCarelessMistakes(mistakes, container.querySelector('.careless-mistake-list'));
+                    container.dataset.page = page + 1;
+                } else {
+                    container.dataset.hasMore = 'false';
+                    const message = page === 1 ? '这里还没有记录哦。' : '已经到底啦！';
+                    if (!container.querySelector('.end-message')) {
+                         container.insertAdjacentHTML('beforeend', `<p class="end-message">${message}</p>`);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading careless mistakes:', error);
+                if (loader) loader.innerText = '加载失败，请重试。';
+            })
+            .finally(() => {
+                container.dataset.isLoading = 'false';
+            });
+    }
+
+    function renderCarelessMistakes(mistakes, container) {
+        let html = '';
+        mistakes.forEach(m => {
+            html += `
+            <div class="question-block careless-mistake-block" data-mistake-id="${m.id}">
+                <div class="date-header-inline">${m.upload_date.split(' ')[0]}</div>
+                <h3>原题图片</h3>
+                <img src="data:image/jpeg;base64,${m.original_image_b64}" alt="错题图片">
+                <h3>我的反思</h3>
+                <div class="user-reflection-content">
+                    ${m.user_reflection}
+                </div>
+            </div>`;
+        });
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
 
 });

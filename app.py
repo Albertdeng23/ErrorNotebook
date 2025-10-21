@@ -1,8 +1,8 @@
 import json
 import base64
-from datetime import date, timedelta
+from datetime import date, timedelta,datetime
 from collections import Counter
-
+from whitenoise import WhiteNoise
 from flask import Flask, render_template, request, jsonify
 from markdown_it import MarkdownIt
 
@@ -12,6 +12,7 @@ import database
 
 # --- 1. 初始化 Flask 应用和扩展 ---
 app = Flask(__name__)
+app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/')
 app.config['SECRET_KEY'] = 'your-super-secret-key-for-wrong-answer-book'
 
 # 初始化 Markdown 转换器
@@ -235,7 +236,56 @@ def get_summary(date_str):
     
     return jsonify(daily_summary)
 
+@app.route('/upload-careless-mistake', methods=['POST'])
+def upload_careless_mistake():
+    """处理粗心错误上传的API端点。"""
+    print("Received a careless mistake upload request...")
+    try:
+        file = request.files.get('question_image')
+        # 从富文本编辑器获取的内容是HTML格式
+        user_reflection = request.form.get('user_reflection')
+
+        if not file or file.filename == '' or not user_reflection:
+            return jsonify({'status': 'failed', 'message': '必须上传图片并填写反思内容！'}), 400
+
+        image_bytes = file.read()
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        mistake_data = {
+            "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "original_image_b64": image_b64,
+            "user_reflection": user_reflection
+        }
+
+        database.add_careless_mistake(mistake_data)
+        
+        print("Careless mistake processed and saved successfully.")
+        return jsonify({'status': 'success', 'message': '粗心错误记录成功！'})
+
+    except Exception as e:
+        print(f"An unexpected error occurred in /upload-careless-mistake: {e}")
+        return jsonify({'status': 'failed', 'message': f'服务器内部错误: {e}'}), 500
+
+
+@app.route('/get-careless-mistakes')
+def get_careless_mistakes():
+    """提供分页粗心错误数据的API端点。"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        limit = 5 # 每次加载5条
+        offset = (page - 1) * limit
+        
+        raw_mistakes = database.get_careless_mistakes(limit, offset)
+        
+        # 将数据库行对象转换为字典列表
+        mistakes_list = [dict(row) for row in raw_mistakes]
+            
+        return jsonify(mistakes_list)
+    except Exception as e:
+        print(f"Error in /get-careless-mistakes: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 # --- 4. 启动应用 ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
