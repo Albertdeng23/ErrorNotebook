@@ -5,7 +5,7 @@ from collections import Counter
 from whitenoise import WhiteNoise
 from flask import Flask, render_template, request, jsonify
 from markdown_it import MarkdownIt
-
+from flask import Response, stream_with_context
 # 从我们自己的模块中导入所需函数
 import core
 import database
@@ -315,6 +315,46 @@ def delete_careless_mistake(mistake_id):
     except Exception as e:
         print(f"Error deleting careless mistake {mistake_id}: {e}")
         return jsonify({'status': 'failed', 'message': f'删除失败: {e}'}), 500
+
+
+@app.route('/chat/<int:question_id>')
+def chat_page(question_id):
+    """渲染独立的聊天页面。"""
+    print(f"Loading chat page for question ID: {question_id}")
+    question_data = database.get_question_by_id(question_id)
+    if not question_data:
+        return "Question not found", 404
+    
+    # 将数据库行对象转换为可序列化的字典
+    q_dict = dict(question_data)
+    try:
+        # 反序列化JSON字符串字段以便在模板中使用
+        q_dict['knowledge_points'] = json.loads(q_dict['knowledge_points'])
+        q_dict['ai_analysis'] = json.loads(q_dict['ai_analysis'])
+        q_dict['similar_examples'] = json.loads(q_dict['similar_examples'])
+    except (json.JSONDecodeError, TypeError):
+        # 如果解析失败，提供默认空值
+        q_dict['knowledge_points'], q_dict['ai_analysis'], q_dict['similar_examples'] = [], [], []
+
+    return render_template('chat.html', question=q_dict)
+
+
+@app.route('/chat-stream', methods=['POST'])
+def chat_stream():
+    """处理流式聊天请求的API端点。"""
+    data = request.get_json()
+    messages = data.get('messages', [])
+
+    if not messages:
+        return Response("No messages provided", status=400)
+
+    def generate():
+        # 使用 stream_with_context 确保在流式传输期间应用上下文是可用的
+        yield from core.chat_with_ai_stream(messages)
+
+    # 使用 text/event-stream 类型，这是服务器发送事件(SSE)的标准
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
 
 # --- 4. 启动应用 ---
 if __name__ == '__main__':

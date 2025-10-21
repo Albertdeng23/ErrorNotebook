@@ -225,6 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
             html += `
             <div class="question-block" data-question-id="${q.id}">
                 <div class="action-toolbar">
+                     <button class="action-btn" data-action="chat" title="和AI聊聊"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>
                     <button class="action-btn" data-action="regenerate" title="重新生成解析"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
                     <button class="action-btn" data-action="edit" title="修改解析 (待实现)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
                     <button class="action-btn" data-action="copy" title="复制解析"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
@@ -463,6 +464,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     case 'copy': handleCopy(questionId, actionBtn); break;
                     case 'regenerate': handleRegenerate(questionId, questionBlock); break;
                     case 'edit': alert('修改功能正在开发中！'); break;
+                    case 'chat': handleChat(questionId); break; // <-- 【新增】
+                    case 'delete': handleDelete(questionId, questionBlock); break;
                 }
             }
 
@@ -477,6 +480,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+    }
+
+    function handleChat(id) {
+    window.open(`/chat/${id}`, '_blank');
     }
 
     function handleDelete(id, element) {
@@ -713,4 +720,5 @@ function handleEditCareless(id, element) {
         reflectionContainer.innerHTML = originalHtml;
         element.classList.remove('is-editing');
     });
+
 }

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>与AI聊聊</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="chat-page-body">
+    
+    <!-- 左侧边栏：题目上下文 -->
+    <aside class="chat-sidebar">
+        <div class="sidebar-header">
+            <a href="/" title="返回主页">&larr;</a>
+            <h3>题目追问</h3>
+        </div>
+        <div class="sidebar-content">
+            <div class="question-block">
+                <h4>原题图片</h4>
+                <!-- 【关键】给图片添加 id 以便JS控制，并使其可点击放大 -->
+                <img id="sidebar-image" src="data:image/jpeg;base64,{{ question.original_image_b64 }}" alt="错题图片">
+                
+                <h4>AI初步解析</h4>
+                <div class="ai-analysis-content">
+                    <!-- 【关键】使用 safe 过滤器正确渲染已有的HTML -->
+                    {{ question.problem_analysis | safe }}
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 右侧主聊天区 -->
+    <main class="chat-main">
+        <div id="chat-messages" class="chat-messages">
+            <!-- 初始欢迎消息 -->
+            <div class="message ai">
+                <div class="avatar">🤖</div>
+                <div class="message-content">
+                    <p>你好！我是你的专属AI辅导老师。我已经阅读了这道题的背景，有什么具体问题，随时问我吧！</p>
+                </div>
+            </div>
+            <!-- 后续聊天消息将由JS动态插入 -->
+        </div>
+
+        <div class="chat-input-area">
+            <form id="chat-form" class="chat-form">
+                <textarea id="message-input" placeholder="请在此输入你的问题..." required rows="1"></textarea>
+                <button type="submit" id="send-btn" title="发送">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <!-- 【新增】图片灯箱/模态框的HTML结构 -->
+    <div id="image-modal" class="image-modal">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="modal-image">
+    </div>
+
+    <!-- 将后端数据安全地传递给JavaScript -->
+    <script>
+        const initialQuestionData = {{ question | tojson }};
+    </script>
+    <!-- 引入Markdown-it库用于前端渲染 -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+</body>
+</html>
