@@ -291,6 +291,39 @@ def delete_careless_mistake(mistake_id: int):
         print(f"Deleted careless mistake with ID: {mistake_id}")
 
 
+def update_or_add_summary(summary_data: dict):
+    """
+    更新或插入一条每日总结。
+    如果指定日期的总结已存在，则更新它；否则，插入新记录。
+    【已修复】增加了 created_at 字段以满足 NOT NULL 约束。
+    """
+    sql = """
+        INSERT OR REPLACE INTO daily_summaries (
+            id, summary_date, general_summary, knowledge_points_summary,
+            question_count, subject_chart_data, created_at
+        ) VALUES (
+            (SELECT id FROM daily_summaries WHERE summary_date = ?),
+            ?, ?, ?, ?, ?, ?
+        );
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, (
+                summary_data['date'], # For the SELECT subquery
+                summary_data['date'], # For the VALUES clause
+                summary_data['ai_summary']['general_summary'],
+                json.dumps(summary_data['ai_summary']['knowledge_points_summary'], ensure_ascii=False),
+                summary_data['question_count'],
+                json.dumps(summary_data['subject_chart_data'], ensure_ascii=False),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S") # <-- 【关键修复】添加当前时间
+            ))
+            conn.commit()
+            print(f"Successfully saved or updated summary for date: {summary_data['date']}")
+        except sqlite3.Error as e:
+            print(f"Error in update_or_add_summary: {e}")
+
+
 # --- 用于独立测试本模块功能的示例 ---
 if __name__ == '__main__':
     print("--- Running database module tests ---")

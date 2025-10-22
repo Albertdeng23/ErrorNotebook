@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- 引入 Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- 【新增】引入 TinyMCE 富文本编辑器 CDN -->
+    <!-- 引入 TinyMCE 富文本编辑器 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js" referrerpolicy="origin"></script>
 </head>
 <body>
@@ -22,22 +22,44 @@
                 <canvas id="weekly-chart"></canvas>
             </div>
 
-            <!-- 右侧：每日总结 (现在是一个动态容器) -->
+            <!-- 【已修改】右侧：每日总结 (现在是一个动态容器) -->
             <div id="daily-summary-container" class="summary-content">
+                {% if initial_summary_data %}
+                <!-- 如果后端传来了初始数据，直接渲染 -->
+                <h2>学习总结 ({{ initial_summary_data.date }})</h2>
+                <button id="regenerate-summary-btn" class="secondary-btn" title="使用最新的AI模型重新生成总结">
+                    🔄 重新生成
+                </button>
+                {% if initial_summary_data.ai_summary and not initial_summary_data.ai_summary.error %}
+                    <p><strong>学习总纲：</strong>{{ initial_summary_data.ai_summary.general_summary }}</p>
+                    <p><strong>核心知识点：</strong></p>
+                    <ul>
+                        {% for point in initial_summary_data.ai_summary.knowledge_points_summary %}
+                        <li>{{ point }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="error-text">AI总结生成失败或不可用。</p>
+                {% endif %}
+                <div class="summary-stats">
+                    <div class="stat-item"><strong>当日错题数：</strong> {{ initial_summary_data.question_count }} 道</div>
+                    <div class="stat-item subject-chart-container"><strong>科目分布：</strong><canvas id="subject-bar-chart-dynamic"></canvas></div>
+                </div>
+                {% else %}
+                <!-- 否则，显示占位符 -->
                 <div class="placeholder">
                     <h2>学习总结</h2>
                     <p>请点击左侧日历中有记录的日期，查看对应日期的学习总结。</p>
                 </div>
+                {% endif %}
             </div>
         </div>
         <!-- ==================== 总结区域结束 ==================== -->
 
 
         <!-- ==================== 主内容区域 ==================== -->
-        <!-- 【修改】主选项卡按钮 -->
         <div class="tab-buttons">
             <button class="tab-btn active" data-tab="review-tab">错题回顾</button>
-            <!-- 【新增】计算错误选项卡按钮 -->
             <button class="tab-btn" data-tab="careless-mistake-tab">计算错误</button>
             <button class="tab-btn" data-tab="upload-tab">上传新题</button>
         </div>
@@ -98,7 +120,7 @@
                 {% endif %}
             </div>
 
-            <!-- 【新增】2. 计算错误回顾面板 -->
+            <!-- 2. 计算错误回顾面板 -->
             <div id="careless-mistake-tab" class="tab-pane" data-page="1" data-has-more="true" data-is-loading="false">
                 <div class="careless-mistake-list">
                     <!-- 粗心错误内容将由JavaScript动态加载 -->
@@ -106,7 +128,7 @@
                 <div class="loader">加载中...</div>
             </div>
 
-            <!-- 【确认/替换】3. 上传错题面板 -->
+            <!-- 3. 上传错题面板 -->
             <div id="upload-tab" class="tab-pane">
                 <!-- 上传区域的子选项卡 -->
                 <div class="subject-tab-buttons upload-sub-tabs">
@@ -163,7 +185,38 @@
         // 使用 tojson 过滤器安全地将Python数据转换为JavaScript对象
         const weeklyChartData = {{ weekly_chart_data | tojson }};
         const allDatesWithRecords = {{ all_dates | tojson }};
+        // 【关键】将初始总结数据也传递给JS
+        const initialSummaryData = {{ initial_summary_data | tojson }};
     </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- 【新增】用于初始化页面加载时的每日总结图表 -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 这里的 initialSummaryData 变量是在上面的 script 标签中定义的
+        if (initialSummaryData && initialSummaryData.subject_chart_data) {
+            const ctx = document.getElementById('subject-bar-chart-dynamic');
+            if (ctx) { // 确保 canvas 元素存在
+                new Chart(ctx.getContext('2d'), {
+                    type: 'bar',
+                    data: { 
+                        labels: initialSummaryData.subject_chart_data.labels, 
+                        datasets: [{ 
+                            label: '科目错题数', 
+                            data: initialSummaryData.subject_chart_data.data, 
+                            backgroundColor: ['rgba(255, 99, 132, 0.5)', 'rgba(54, 162, 235, 0.5)', 'rgba(255, 206, 86, 0.5)', 'rgba(75, 192, 192, 0.5)', 'rgba(153, 102, 255, 0.5)', 'rgba(255, 159, 64, 0.5)'], 
+                            borderWidth: 1 
+                        }] 
+                    },
+                    options: { 
+                        indexAxis: 'y', 
+                        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
+                        plugins: { legend: { display: false } } 
+                    }
+                });
+            }
+        }
+    });
+    </script>
 </body>
 </html>
