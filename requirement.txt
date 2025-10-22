@@ -1,0 +1,16 @@
+# Flask Web Framework
+Flask==3.0.3
+
+# OpenAI API Client for AI analysis
+openai==1.35.3
+
+# For loading environment variables from .env file
+python-dotenv==1.0.1
+
+# Python Imaging Library for handling image uploads
+Pillow==10.3.0
+
+# Production WSGI server for deployment
+gunicorn==22.0.0
+
+markdown-it-py

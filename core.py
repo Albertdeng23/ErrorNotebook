@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
-
+import httpx
 # 加载 .env 文件中的环境变量
 load_dotenv()
 
@@ -14,15 +14,31 @@ load_dotenv()
 API_KEY = os.getenv("API_KEY")
 API_URL = os.getenv("API_URL")
 AI_MODEL = os.getenv("AI_MODEL")
-
+PROXY_URL = os.getenv("PROXY_URL")
 # --- 2. 初始化 OpenAI 客户端 ---
 # 使用获取到的配置来初始化一个可以与API通信的客户端实例
 # 注意：我们使用了 base_url 参数，使其可以与非官方OpenAI的兼容API端点通信
+# --- 2. 初始化 OpenAI 客户端 (已更新为支持代理) ---
 try:
+    # 3. 如果配置了代理，则创建一个带代理的 httpx 客户端
+    if PROXY_URL:
+        print(f"Using proxy: {PROXY_URL}")
+        proxies = {
+            "http://": PROXY_URL,
+            "https://": PROXY_URL,
+        }
+        http_client = httpx.Client(proxies=proxies)
+    else:
+        http_client = None
+
+    # 4. 将 http_client 传递给 OpenAI 客户端
     client = OpenAI(
         api_key=API_KEY,
         base_url=API_URL,
+        http_client=http_client  # <-- 关键改动
     )
+    print("OpenAI client initialized successfully.")
+
 except Exception as e:
     print(f"Error initializing OpenAI client: {e}")
     client = None
