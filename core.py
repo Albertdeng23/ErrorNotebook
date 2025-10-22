@@ -265,6 +265,50 @@ def generate_daily_summary_with_ai(yesterday_questions_text: str) -> dict:
         print(f"An error occurred during AI summary generation: {e}")
         return {"error": str(e)}
 
+def chat_with_ai_stream(messages: list):
+    """
+    与AI进行流式聊天。
+
+    Args:
+        messages: 一个包含聊天历史的列表，遵循OpenAI API格式。
+
+    Yields:
+        AI响应的文本块 (chunks)。
+    """
+    if not client:
+        yield '{"error": "AI client is not initialized."}'
+        return
+
+    try:
+        # 确保AI知道它的角色
+        system_prompt = {
+            "role": "system",
+            "content": """
+            你是一个大学老师师，你善于用直观的方法的为学生解释问题。你会的知识包括但不限于高等数学、物理化学、材料分析测试方法、材料科学基础。你喜欢苏格რ底式启发式教育，你觉得这有利于学生理解问题。
+            你的做法：
+            首先给出结论，然后再慢慢启发式解释“为什么”是这样的结论。
+            对于题目，你会根据学生的错误选项揣测他可能犯的错误，然后给出解答"""
+        }
+        
+        # 将系统提示插入到消息列表的开头
+        messages_with_system_prompt = [system_prompt] + messages
+
+        print("Sending stream request to AI API...")
+        response = client.chat.completions.create(
+            model=AI_MODEL,
+            messages=messages_with_system_prompt,
+            stream=True,  # <-- 关键：开启流式响应
+            max_tokens=4096
+        )
+
+        for chunk in response:
+            content = chunk.choices[0].delta.content or ""
+            if content:
+                yield content
+
+    except Exception as e:
+        print(f"An error occurred during AI stream chat: {e}")
+        yield f'{{"error": "与AI通信时发生错误: {str(e)}"}}'
 
 
 # --- 这是一个用于独立测试本模块功能的示例 ---

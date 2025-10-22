@@ -44,10 +44,48 @@ def init_db():
                 created_at TEXT NOT NULL
             );
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS careless_mistakes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                upload_date TEXT NOT NULL,
+                original_image_b64 TEXT NOT NULL,
+                user_reflection TEXT NOT NULL
+            );
+        """)
         conn.commit()
         print("Database initialized and 'questions' table is ready.")
 
 # --- 数据写入/修改操作 ---
+
+# --- 【新增】为 careless_mistakes 表添加写入函数 ---
+def add_careless_mistake(mistake_data: dict):
+    """将一条粗心错误记录添加到数据库中。"""
+    sql = """
+        INSERT INTO careless_mistakes (
+            upload_date, original_image_b64, user_reflection
+        ) VALUES (?, ?, ?);
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, (
+                mistake_data.get('upload_date'),
+                mistake_data.get('original_image_b64'),
+                mistake_data.get('user_reflection')
+            ))
+            conn.commit()
+            print("Successfully added a new careless mistake.")
+        except sqlite3.Error as e:
+            print(f"Failed to add careless mistake to database. Error: {e}")
+
+# --- 【新增】为 careless_mistakes 表添加查询函数 (支持分页) ---
+def get_careless_mistakes(limit: int, offset: int) -> list:
+    """分页获取所有粗心错误记录。"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        query = "SELECT * FROM careless_mistakes ORDER BY upload_date DESC LIMIT ? OFFSET ?"
+        cursor.execute(query, (limit, offset))
+        return cursor.fetchall()
 
 def add_question(question_data: dict):
     """
@@ -228,6 +266,62 @@ def get_summary_by_date(date_str: str):
         cursor.execute("SELECT * FROM daily_summaries WHERE summary_date = ?", (date_str,))
         summary = cursor.fetchone()
         return summary
+
+def get_careless_mistake_by_id(mistake_id: int):
+    """根据ID获取一条粗心错误记录。"""
+    with get_db_connection() as conn:
+        mistake = conn.execute('SELECT * FROM careless_mistakes WHERE id = ?', (mistake_id,)).fetchone()
+        return mistake
+
+def update_careless_mistake(mistake_id: int, new_reflection: str):
+    """根据ID更新一条粗心错误记录的反思内容。"""
+    with get_db_connection() as conn:
+        conn.execute(
+            'UPDATE careless_mistakes SET user_reflection = ? WHERE id = ?',
+            (new_reflection, mistake_id)
+        )
+        conn.commit()
+        print(f"Updated careless mistake with ID: {mistake_id}")
+
+def delete_careless_mistake(mistake_id: int):
+    """根据ID删除一条粗心错误记录。"""
+    with get_db_connection() as conn:
+        conn.execute('DELETE FROM careless_mistakes WHERE id = ?', (mistake_id,))
+        conn.commit()
+        print(f"Deleted careless mistake with ID: {mistake_id}")
+
+
+def update_or_add_summary(summary_data: dict):
+    """
+    更新或插入一条每日总结。
+    如果指定日期的总结已存在，则更新它；否则，插入新记录。
+    【已修复】增加了 created_at 字段以满足 NOT NULL 约束。
+    """
+    sql = """
+        INSERT OR REPLACE INTO daily_summaries (
+            id, summary_date, general_summary, knowledge_points_summary,
+            question_count, subject_chart_data, created_at
+        ) VALUES (
+            (SELECT id FROM daily_summaries WHERE summary_date = ?),
+            ?, ?, ?, ?, ?, ?
+        );
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, (
+                summary_data['date'], # For the SELECT subquery
+                summary_data['date'], # For the VALUES clause
+                summary_data['ai_summary']['general_summary'],
+                json.dumps(summary_data['ai_summary']['knowledge_points_summary'], ensure_ascii=False),
+                summary_data['question_count'],
+                json.dumps(summary_data['subject_chart_data'], ensure_ascii=False),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S") # <-- 【关键修复】添加当前时间
+            ))
+            conn.commit()
+            print(f"Successfully saved or updated summary for date: {summary_data['date']}")
+        except sqlite3.Error as e:
+            print(f"Error in update_or_add_summary: {e}")
 
 
 # --- 用于独立测试本模块功能的示例 ---

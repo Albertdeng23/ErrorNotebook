@@ -1,17 +1,18 @@
 import json
 import base64
-from datetime import date, timedelta
+from datetime import date, timedelta,datetime
 from collections import Counter
-
+from whitenoise import WhiteNoise
 from flask import Flask, render_template, request, jsonify
 from markdown_it import MarkdownIt
-
+from flask import Response, stream_with_context
 # 从我们自己的模块中导入所需函数
 import core
 import database
 
 # --- 1. 初始化 Flask 应用和扩展 ---
 app = Flask(__name__)
+app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/')
 app.config['SECRET_KEY'] = 'your-super-secret-key-for-wrong-answer-book'
 
 # 初始化 Markdown 转换器
@@ -40,10 +41,18 @@ with app.app_context():
 def index():
     """
     主页面路由。
-    (已简化，不再处理每日总结，只渲染页面框架)
+    【已修改】现在会主动加载最新一天的总结数据。
     """
     print("Loading main page shell...")
     
+    # --- 【新增】初始总结逻辑 ---
+    initial_summary_data = None
+    latest_date = database.get_latest_question_date() # 获取最新记录的日期
+    if latest_date:
+        print(f"Latest question date is {latest_date}. Fetching initial summary...")
+        initial_summary_data = get_or_generate_summary_for_date(latest_date)
+    # --- 总结逻辑结束 ---
+
     # --- 周度图表逻辑 (保持不变) ---
     weekly_stats_raw = database.get_weekly_summary_stats()
     last_7_days = [(date.today() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
@@ -60,7 +69,8 @@ def index():
         'index.html', 
         subjects=subjects, 
         all_dates=all_dates,
-        weekly_chart_data=weekly_chart_data
+        weekly_chart_data=weekly_chart_data,
+        initial_summary_data=initial_summary_data # <-- 【关键】将初始总结数据传递给模板
     )
 
 
@@ -189,11 +199,195 @@ def get_summary(date_str):
     """
     print(f"Request received for summary of date: {date_str}")
     
-    # 1. 尝试从数据库读取该日期的总结
+    summary_data = get_or_generate_summary_for_date(date_str)
+    
+    if summary_data:
+        return jsonify(summary_data)
+    else:
+        return jsonify({"message": f"日期 {date_str} 没有错题记录，无法生成总结。"}), 404
+    
+# in app.py
+
+@app.route('/regenerate-summary/<string:date_str>', methods=['POST'])
+def regenerate_summary(date_str):
+    """
+    强制重新生成指定日期的总结，并更新数据库。
+    【已修复】增加了 try...except 块以处理内部错误。
+    """
+    print(f"Received FORCE regeneration request for date: {date_str}")
+    
+    try:
+        # 1. 获取当天的所有错题
+        questions_for_date = database.get_questions_by_date(date_str)
+        if not questions_for_date:
+            return jsonify({"error": f"日期 {date_str} 没有错题记录，无法重新生成总结。"}), 404
+
+        # 2. 强制调用 AI 生成新总结
+        print(f"Found {len(questions_for_date)} questions. Forcing AI regeneration...")
+        summary_text_list = [q['problem_analysis'] for q in questions_for_date]
+        subjects_list = [q['subject'] for q in questions_for_date]
+        
+        ai_summary_content = core.generate_daily_summary_with_ai("\n".join(summary_text_list))
+        
+        if 'error' in ai_summary_content:
+            # 即使AI返回错误，我们也将其视为一种“成功”的生成结果（生成了错误提示）
+            # 所以我们继续流程，将其存入数据库
+            print(f"AI generation failed with message: {ai_summary_content['error']}")
+
+        # 3. 准备新的数据结构
+        subject_counts = Counter(subjects_list)
+        new_summary_data = {
+            "date": date_str,
+            "ai_summary": ai_summary_content,
+            "question_count": len(questions_for_date),
+            "subject_chart_data": {
+                "labels": list(subject_counts.keys()),
+                "data": list(subject_counts.values())
+            }
+        }
+        
+        # 4. 使用新函数更新或保存到数据库
+        database.update_or_add_summary(new_summary_data)
+        
+        # 5. 将新生成的总结返回给前端
+        return jsonify(new_summary_data)
+
+    except Exception as e:
+        # 【关键修复】捕获任何未预料的错误（比如数据库连接失败）
+        print(f"An unexpected error occurred in /regenerate-summary: {e}")
+        return jsonify({"error": "服务器内部发生未知错误，请稍后再试。"}), 500
+
+
+@app.route('/upload-careless-mistake', methods=['POST'])
+def upload_careless_mistake():
+    """处理粗心错误上传的API端点。"""
+    print("Received a careless mistake upload request...")
+    try:
+        file = request.files.get('question_image')
+        # 从富文本编辑器获取的内容是HTML格式
+        user_reflection = request.form.get('user_reflection')
+
+        if not file or file.filename == '' or not user_reflection:
+            return jsonify({'status': 'failed', 'message': '必须上传图片并填写反思内容！'}), 400
+
+        image_bytes = file.read()
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        mistake_data = {
+            "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "original_image_b64": image_b64,
+            "user_reflection": user_reflection
+        }
+
+        database.add_careless_mistake(mistake_data)
+        
+        print("Careless mistake processed and saved successfully.")
+        return jsonify({'status': 'success', 'message': '粗心错误记录成功！'})
+
+    except Exception as e:
+        print(f"An unexpected error occurred in /upload-careless-mistake: {e}")
+        return jsonify({'status': 'failed', 'message': f'服务器内部错误: {e}'}), 500
+
+
+@app.route('/get-careless-mistakes')
+def get_careless_mistakes():
+    """提供分页粗心错误数据的API端点。"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        limit = 5 # 每次加载5条
+        offset = (page - 1) * limit
+        
+        raw_mistakes = database.get_careless_mistakes(limit, offset)
+        
+        # 将数据库行对象转换为字典列表
+        mistakes_list = [dict(row) for row in raw_mistakes]
+            
+        return jsonify(mistakes_list)
+    except Exception as e:
+        print(f"Error in /get-careless-mistakes: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/update-careless-mistake/<int:mistake_id>', methods=['POST'])
+def update_careless_mistake(mistake_id):
+    """处理更新粗心错误反思的API端点。"""
+    try:
+        new_reflection = request.form.get('user_reflection')
+        if new_reflection is None:
+            return jsonify({'status': 'failed', 'message': '缺少反思内容'}), 400
+        
+        database.update_careless_mistake(mistake_id, new_reflection)
+        
+        # 返回更新后的内容，方便前端直接渲染
+        return jsonify({
+            'status': 'success', 
+            'message': '反思已更新', 
+            'new_reflection': new_reflection
+        })
+    except Exception as e:
+        print(f"Error updating careless mistake {mistake_id}: {e}")
+        return jsonify({'status': 'failed', 'message': f'更新失败: {e}'}), 500
+
+
+@app.route('/delete-careless-mistake/<int:mistake_id>', methods=['DELETE'])
+def delete_careless_mistake(mistake_id):
+    """处理删除粗心错误的API端点。"""
+    try:
+        database.delete_careless_mistake(mistake_id)
+        return jsonify({'status': 'success', 'message': '记录已删除'}), 200
+    except Exception as e:
+        print(f"Error deleting careless mistake {mistake_id}: {e}")
+        return jsonify({'status': 'failed', 'message': f'删除失败: {e}'}), 500
+
+
+@app.route('/chat/<int:question_id>')
+def chat_page(question_id):
+    """渲染独立的聊天页面。"""
+    print(f"Loading chat page for question ID: {question_id}")
+    question_data = database.get_question_by_id(question_id)
+    if not question_data:
+        return "Question not found", 404
+    
+    # 将数据库行对象转换为可序列化的字典
+    q_dict = dict(question_data)
+    try:
+        # 反序列化JSON字符串字段以便在模板中使用
+        q_dict['knowledge_points'] = json.loads(q_dict['knowledge_points'])
+        q_dict['ai_analysis'] = json.loads(q_dict['ai_analysis'])
+        q_dict['similar_examples'] = json.loads(q_dict['similar_examples'])
+    except (json.JSONDecodeError, TypeError):
+        # 如果解析失败，提供默认空值
+        q_dict['knowledge_points'], q_dict['ai_analysis'], q_dict['similar_examples'] = [], [], []
+
+    return render_template('chat.html', question=q_dict)
+
+
+@app.route('/chat-stream', methods=['POST'])
+def chat_stream():
+    """处理流式聊天请求的API端点。"""
+    data = request.get_json()
+    messages = data.get('messages', [])
+
+    if not messages:
+        return Response("No messages provided", status=400)
+
+    def generate():
+        # 使用 stream_with_context 确保在流式传输期间应用上下文是可用的
+        yield from core.chat_with_ai_stream(messages)
+
+    # 使用 text/event-stream 类型，这是服务器发送事件(SSE)的标准
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+
+def get_or_generate_summary_for_date(date_str):
+    """
+    一个可复用的辅助函数，用于获取或生成指定日期的总结。
+    返回一个包含总结数据的字典，或在没有数据时返回 None。
+    """
+    # 1. 尝试从数据库读取
     saved_summary = database.get_summary_by_date(date_str)
     if saved_summary:
         print(f"Found saved summary for {date_str} in database.")
-        daily_summary = {
+        return {
             "date": saved_summary['summary_date'],
             "ai_summary": {
                 "general_summary": saved_summary['general_summary'],
@@ -202,17 +396,14 @@ def get_summary(date_str):
             "question_count": saved_summary['question_count'],
             "subject_chart_data": json.loads(saved_summary['subject_chart_data'])
         }
-        return jsonify(daily_summary)
 
-    # 2. 如果数据库中没有，则尝试生成
-    print(f"No saved summary for {date_str}. Trying to generate one...")
+    # 2. 如果没有，则尝试生成
     questions_for_date = database.get_questions_by_date(date_str)
-    
     if not questions_for_date:
         print(f"No questions found for {date_str}. Cannot generate summary.")
-        return jsonify({"message": f"日期 {date_str} 没有错题记录，无法生成总结。"}), 404
+        return None
 
-    # 3. 如果当天有错题，则生成、保存并返回总结
+    # 3. 如果当天有错题，则生成、保存并返回
     print(f"Found {len(questions_for_date)} questions for {date_str}. Generating new summary...")
     summary_text_list = [q['problem_analysis'] for q in questions_for_date]
     subjects_list = [q['subject'] for q in questions_for_date]
@@ -231,11 +422,12 @@ def get_summary(date_str):
     }
     
     if 'error' not in ai_summary_content:
-        database.add_daily_summary(daily_summary)
+        # database.add_daily_summary(daily_summary)
+        database.update_or_add_summary(daily_summary)
     
-    return jsonify(daily_summary)
-
+    return daily_summary
 
 # --- 4. 启动应用 ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
