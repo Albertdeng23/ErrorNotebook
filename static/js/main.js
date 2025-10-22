@@ -79,11 +79,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('请先选择一个科目！');
                 return;
             }
-            activePane.innerHTML = '<div class="loader">加载中...</div>';
-            activePane.dataset.page = "1";
-            activePane.dataset.hasMore = "true";
-            activePane.dataset.lastDate = "";
-            loadQuestionsForActiveSubject(date);
+            
+            // 【核心修改】重置面板并设置新的起始日期状态
+            activePane.innerHTML = '<div class="loader">加载中...</div>'; // 清空旧内容
+            activePane.dataset.page = "1"; // 重置页码
+            activePane.dataset.hasMore = "true"; // 重置加载状态
+            activePane.dataset.lastDate = ""; // 重置上一个日期
+            activePane.dataset.currentDate = date; // <-- 【新增】记住当前要开始加载的日期
+
+            // 调用加载函数（不再需要传递参数）
+            loadQuestionsForActiveSubject();
+            
+            // 每日总结的逻辑保持不变
             fetchAndRenderSummary(date);
         });
 
@@ -128,12 +135,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const subjectTabPanes = document.querySelectorAll('.subject-pane');
     subjectTabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
+            // 移除所有按钮和面板的 active 状态
             subjectTabBtns.forEach(b => b.classList.remove('active'));
             subjectTabPanes.forEach(p => p.classList.remove('active'));
+            
+            // 激活被点击的按钮
             btn.classList.add('active');
+
+            // 【正确顺序】
+            // 1. 先根据按钮的 data-subject 找到对应的面板
             const activePane = document.getElementById(`subject-${btn.dataset.subject}`);
+            
+            // 2. 现在可以安全地对 activePane 进行操作了
+            // 清除日期状态，这样加载时就会从最新的开始
+            activePane.dataset.currentDate = ''; 
+            
+            // 3. 激活这个面板，让它显示出来
             activePane.classList.add('active');
             
+            // 4. 如果面板是空的，就加载初始数据
             if (activePane.children.length <= 1) {
                 loadQuestionsForActiveSubject();
             }
@@ -143,46 +163,67 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 1.3. 页面加载时，为默认激活的科目加载初始数据 ---
     loadQuestionsForActiveSubject();
 
-    // --- 1.4. 无限滚动加载 ---
-    // --- 1.4. 无限滚动加载 (稍作修改以支持新面板) ---
-    const mainContentArea = document.querySelector('.tab-content'); // 监听更大的容器
-    if (mainContentArea) {
-        mainContentArea.addEventListener('scroll', () => {
-            // 错题回顾的滚动
-            const activeReviewPane = document.querySelector('.subject-pane.active');
-            const contentArea = document.querySelector('.content-area');
-            if (activeReviewPane && contentArea) {
-                const isLoading = activeReviewPane.dataset.isLoading === 'true';
-                const hasMore = activeReviewPane.dataset.hasMore === 'true';
-                if (hasMore && !isLoading && contentArea.scrollTop + contentArea.clientHeight >= contentArea.scrollHeight - 200) {
-                    loadQuestionsForActiveSubject();
-                }
-            }
+    // --- 1.4. 无限滚动加载 (已修复) ---
 
-            // 【新增】计算错误面板的滚动
-            const activeCarelessPane = document.querySelector('#careless-mistake-tab.active');
-            if (activeCarelessPane) {
-                const isLoading = activeCarelessPane.dataset.isLoading === 'true';
-                const hasMore = activeCarelessPane.dataset.hasMore === 'true';
-                if (hasMore && !isLoading && activeCarelessPane.scrollTop + activeCarelessPane.clientHeight >= activeCarelessPane.scrollHeight - 100) {
-                    loadCarelessMistakes();
-                }
+    // 1. 直接获取那两个真正会产生滚动条的容器
+    const questionContentArea = document.querySelector('.content-area');
+    const carelessMistakeArea = document.getElementById('careless-mistake-tab');
+
+    // 2. 为“错题回顾”面板添加独立的滚动监听
+    if (questionContentArea) {
+        questionContentArea.addEventListener('scroll', () => {
+            const activePane = document.querySelector('.subject-pane.active');
+            if (!activePane) return; // 如果没有激活的科目面板，则不执行
+
+            const isLoading = activePane.dataset.isLoading === 'true';
+            const hasMore = activePane.dataset.hasMore === 'true';
+            
+            // 判断是否滚动到底部的条件
+            const isAtBottom = questionContentArea.scrollTop + questionContentArea.clientHeight >= questionContentArea.scrollHeight - 200;
+
+            if (hasMore && !isLoading && isAtBottom) {
+                console.log('Scrolling to bottom in questions, loading more...'); // 调试信息
+                loadQuestionsForActiveSubject();
+            }
+        });
+    }
+
+    // 3. 为“计算错误”面板添加独立的滚动监听
+    if (carelessMistakeArea) {
+        carelessMistakeArea.addEventListener('scroll', () => {
+            // 只有当这个面板本身是激活状态时才执行
+            if (!carelessMistakeArea.classList.contains('active')) return;
+
+            const isLoading = carelessMistakeArea.dataset.isLoading === 'true';
+            const hasMore = carelessMistakeArea.dataset.hasMore === 'true';
+
+            // 判断是否滚动到底部的条件
+            const isAtBottom = carelessMistakeArea.scrollTop + carelessMistakeArea.clientHeight >= carelessMistakeArea.scrollHeight - 100;
+
+            if (hasMore && !isLoading && isAtBottom) {
+                console.log('Scrolling to bottom in careless mistakes, loading more...'); // 调试信息
+                loadCarelessMistakes(); // 确保你有一个 loadCarelessMistakes 函数来加载数据
             }
         });
     }
 
     // --- 1.6. 核心函数：从API加载问题 ---
-    function loadQuestionsForActiveSubject(startDate = null) {
+    function loadQuestionsForActiveSubject() {
         const activePane = document.querySelector('.subject-pane.active');
+        // 【修改】移除函数参数，因为我们不再需要它了
         if (!activePane || activePane.dataset.isLoading === 'true') return;
 
         const subject = activePane.dataset.subjectName;
         let page = parseInt(activePane.dataset.page, 10);
         
+        // 【新增】从面板状态中读取起始日期
+        const startDate = activePane.dataset.currentDate;
+
         activePane.dataset.isLoading = 'true';
         const loader = activePane.querySelector('.loader');
         if (loader) loader.style.display = 'block';
 
+        // 【修改】构建API URL时，如果存在起始日期，就总是带上它
         let apiUrl = `/get-questions?subject=${encodeURIComponent(subject)}&page=${page}`;
         if (startDate) {
             apiUrl += `&start_date=${startDate}`;
@@ -195,11 +236,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (questions.length > 0) {
                     renderQuestions(questions, activePane);
                     activePane.dataset.page = page + 1;
+
+                    // 【新增】如果是第一页加载，则自动滚动到目标日期
+                    if (page === 1 && startDate) {
+                        // 使用 setTimeout 确保DOM渲染完成后再滚动
+                        setTimeout(() => {
+                            const targetDateHeader = activePane.querySelector(`#date-${startDate}`);
+                            if (targetDateHeader) {
+                                const contentArea = document.querySelector('.content-area');
+                                // 使用 scrollIntoView 实现平滑滚动
+                                targetDateHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }, 100); // 100毫秒的延迟通常足够
+                    }
+
                 } else {
                     activePane.dataset.hasMore = 'false';
-                    const message = page === 1 ? '这个分类下没有错题哦。' : '已经到底啦！';
+                    const message = (page === 1 && startDate) ? `日期 ${startDate} 下没有错题哦。` : '已经到底啦！';
                     if (!activePane.querySelector('.end-message')) {
-                         activePane.insertAdjacentHTML('beforeend', `<p class="end-message">${message}</p>`);
+                        activePane.insertAdjacentHTML('beforeend', `<p class="end-message">${message}</p>`);
                     }
                 }
             })
