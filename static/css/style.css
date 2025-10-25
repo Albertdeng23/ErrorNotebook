@@ -9,10 +9,11 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    /* 扩宽主容器以提升显示区域 */
+    max-width: 1600px; /* 从1200px拓宽到1600px */
     margin: 0 auto;
     background-color: #fff;
-    padding: 20px 30px;
+    padding: 24px 40px; /* 稍微增加内边距 */
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
@@ -31,9 +32,9 @@ h1 {
 /* --- 总结和图表区域样式 --- */
 .summary-section {
     display: flex;
-    gap: 30px;
+    gap: 36px;
     margin-bottom: 30px;
-    padding: 20px;
+    padding: 22px;
     background-color: #f8f9fa;
     border-radius: 8px;
     border: 1px solid #e9ecef;
@@ -41,11 +42,11 @@ h1 {
 
 .chart-container {
     flex: 1;
-    min-width: 300px;
+    min-width: 380px; /* 放大图表区域，提供更宽展示 */
 }
 
 .summary-content {
-    flex: 2;
+    flex: 2.2; /* 给右侧总结区域更多空间 */
 }
 
 .summary-section h2 {
@@ -79,7 +80,7 @@ h1 {
 }
 
 .subject-chart-container {
-    max-width: 300px; /* 限制条形图的最大宽度 */
+    max-width: 420px; /* 增大条形图容器以获得更好展示 */
 }
 
 .error-text {
@@ -129,13 +130,14 @@ h1 {
 /* --- 错题回顾页面布局 --- */
 .review-container {
     display: flex;
-    gap: 20px;
+    gap: 24px;
 }
 
 .timeline-nav {
-    flex: 0 0 180px; /* 固定宽度，不伸缩 */
+    /* 增宽左侧导航（含日历）以提供更宽的可点击区域 */
+    flex: 0 0 260px; /* 从180px扩大到260px */
     border-right: 1px solid #e0e0e0;
-    padding-right: 20px;
+    padding-right: 24px;
     height: calc(100vh - 250px); /* 视口高度减去一些边距，可根据总结区域高度微调 */
     overflow-y: auto; /* 内容多时可滚动 */
 }
@@ -162,7 +164,8 @@ h1 {
     flex: 1; /* 占据剩余空间 */
     height: calc(100vh - 250px);
     overflow-y: auto; /* 关键：让内容区可以独立滚动 */
-    padding-right: 10px; /* 留出滚动条空间 */
+    padding-right: 14px; /* 留出滚动条空间 */
+    min-width: 720px; /* 保证内容区有足够的宽度以显示题目内容 */
 }
 
 /* --- 科目子选项卡 --- */
@@ -305,6 +308,60 @@ h1 {
     width: 20px;
     height: 20px;
     stroke: #e0e0e0;
+}
+
+/* --- 我的灵光一闪 注释栏样式 --- */
+.insight-panel {
+    margin-top: 16px;
+    background-color: #fbfdff;
+    border: 1px solid #eef3fb;
+    padding: 14px;
+    border-radius: 6px;
+}
+.insight-panel h3.insight-title {
+    margin: 0 0 8px 0;
+    color: #2980b9;
+    border-left: 4px solid #3498db;
+    padding-left: 10px;
+    font-size: 1.02em;
+}
+.insight-display {
+    color: #333;
+    min-height: 44px;
+    line-height: 1.6;
+    white-space: pre-wrap; /* 保持换行 */
+}
+.insight-editor {
+    width: 100%;
+    min-height: 90px;
+    padding: 10px;
+    border: 1px solid #d0d7e0;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+}
+.insight-controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.insight-controls .insight-btn {
+    background-color: #ecf0f1;
+    border: 1px solid #bdc3c7;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.insight-controls .insight-btn:hover {
+    background-color: #dfe9f6;
+}
+.insight-controls .insight-btn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* 为AI解析和例题解答内容添加特定class，方便JS选择 */

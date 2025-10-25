@@ -191,6 +191,23 @@ def regenerate_analysis(question_id):
         return jsonify({'status': 'failed', 'message': f'重新生成失败: {e}'}), 500
 
 
+@app.route('/update-insight/<int:question_id>', methods=['POST'])
+def update_insight(question_id):
+    """保存/更新某条错题的'我的灵光一闪'短注释。前端通过 POST 提交 { insight: '...' }。"""
+    try:
+        data = request.get_json() or {}
+        insight = data.get('insight', '') if isinstance(data, dict) else ''
+        # 简单校验
+        if insight is None:
+            return jsonify({'status': 'failed', 'message': '缺少 insight 字段'}), 400
+
+        database.update_question_insight(question_id, insight)
+        return jsonify({'status': 'success', 'message': '注释已保存', 'insight': insight})
+    except Exception as e:
+        print(f"Error in /update-insight: {e}")
+        return jsonify({'status': 'failed', 'message': f'保存失败: {e}'}), 500
+
+
 # in app.py
 @app.route('/get-summary/<string:date_str>')
 def get_summary(date_str):

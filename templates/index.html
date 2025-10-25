@@ -188,7 +188,14 @@
         // 【关键】将初始总结数据也传递给JS
         const initialSummaryData = {{ initial_summary_data | tojson }};
     </script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- 拆分后的脚本：按依赖顺序加载（utils -> summary -> calendar -> tabs -> upload -> actions -> careless） -->
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/calendar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tabs.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/actions.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/careless.js') }}"></script>
     
     <!-- 【新增】用于初始化页面加载时的每日总结图表 -->
     <script>

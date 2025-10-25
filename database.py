@@ -238,6 +238,18 @@ def migrate_db():
         else:
             print("Column 'user_question' already exists. No migration needed.")
 
+        # 3. 检查 'my_insight' 列是否存在（用于存储用户的短注释 "我的灵光一闪"）
+        if 'my_insight' not in columns:
+            try:
+                print("Column 'my_insight' not found. Adding it now...")
+                cursor.execute("ALTER TABLE questions ADD COLUMN my_insight TEXT DEFAULT ''")
+                conn.commit()
+                print("Successfully added 'my_insight' column to the database.")
+            except sqlite3.Error as e:
+                print(f"Failed to add 'my_insight' column. Error: {e}")
+        else:
+            print("Column 'my_insight' already exists. No migration needed.")
+
 def add_daily_summary(summary_data: dict):
     """将生成的每日总结存入数据库"""
     sql = """
@@ -322,6 +334,14 @@ def update_or_add_summary(summary_data: dict):
             print(f"Successfully saved or updated summary for date: {summary_data['date']}")
         except sqlite3.Error as e:
             print(f"Error in update_or_add_summary: {e}")
+
+
+def update_question_insight(question_id: int, insight: str):
+    """更新一条错题的用户短注释（我的灵光一闪）。"""
+    with get_db_connection() as conn:
+        conn.execute('UPDATE questions SET my_insight = ? WHERE id = ?', (insight, question_id))
+        conn.commit()
+        print(f"Updated my_insight for question ID: {question_id}")
 
 
 # --- 用于独立测试本模块功能的示例 ---
