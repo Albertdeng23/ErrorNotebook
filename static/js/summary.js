@@ -3,6 +3,33 @@
     let subjectChartInstance = null;
     let weeklyChartInstance = null;
 
+    // 确保 Chart.js 可用的辅助函数：如果未加载则尝试加载本地回退脚本，加载完成后回调
+    function ensureChartAvailable(callback) {
+        if (typeof window.Chart !== 'undefined') {
+            return callback && callback();
+        }
+
+        // 查找已有的 script 标签是否在加载 Chart
+        var existing = Array.from(document.scripts).find(s => s.src && s.src.toLowerCase().indexOf('chart') !== -1 && !s._chartHandled);
+        if (existing) {
+            if (existing.complete || existing.readyState === 'complete') {
+                return callback && callback();
+            }
+            existing.addEventListener('load', function() { callback && callback(); });
+            existing.addEventListener('error', function() { console.error('Existing Chart script failed to load'); callback && callback(); });
+            existing._chartHandled = true;
+            return;
+        }
+
+        // 动态插入本地回退脚本
+        var s = document.createElement('script');
+        s.src = '/static/vendor/chart.min.js';
+        s.async = true;
+        s.onload = function() { console.info('Loaded local Chart fallback.'); callback && callback(); };
+        s.onerror = function() { console.error('Failed to load local Chart fallback.'); callback && callback(); };
+        document.head.appendChild(s);
+    }
+
     function createSubjectChart(canvasId, chartData) {
         const ctx = document.getElementById(canvasId);
         if (!ctx) return;
@@ -110,13 +137,17 @@
     window.createSubjectChart = createSubjectChart;
     window.fetchAndUpdateSummary = fetchAndUpdateSummary;
     window.attachRegenerateListener = attachRegenerateListener;
+    window.ensureChartAvailable = ensureChartAvailable;
 
-    // 页面加载时渲染近7日折线图（如果后端注入了 weeklyChartData）
+    // 页面加载时渲染近7日折线图（如果后端注入了 weeklyChartData） — 使用 ensureChartAvailable 做防护
     document.addEventListener('DOMContentLoaded', function() {
         try {
-            if (typeof weeklyChartData !== 'undefined' && weeklyChartData && Array.isArray(weeklyChartData.labels) && weeklyChartData.labels.length > 0) {
-                const el = document.getElementById('weekly-chart');
-                if (el) {
+            if (typeof weeklyChartData === 'undefined' || !weeklyChartData || !Array.isArray(weeklyChartData.labels) || weeklyChartData.labels.length === 0) return;
+            var initWeekly = function() {
+                try {
+                    if (typeof Chart === 'undefined') { console.warn('Chart.js 未定义，跳过 weekly chart 初始化'); return; }
+                    const el = document.getElementById('weekly-chart');
+                    if (!el) return;
                     const ctx = el.getContext('2d');
                     if (weeklyChartInstance) { try { weeklyChartInstance.destroy(); } catch (e) {} }
                     weeklyChartInstance = new Chart(ctx, {
@@ -124,11 +155,14 @@
                         data: { labels: weeklyChartData.labels, datasets: [{ label: '每日新增错题数', data: weeklyChartData.data, borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', tension: 0.1, fill: true }] },
                         options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
                     });
-                }
-            }
-        } catch (err) {
-            console.error('初始化 weekly chart 时出错:', err);
-        }
+                } catch (err) { console.error('初始化 weekly chart 时出错:', err); }
+            };
+
+            // 通过 ensureChartAvailable 确保 Chart.js 可用后再初始化
+            ensureChartAvailable(function() {
+                initWeekly();
+            });
+        } catch (err) { console.error('初始化 weekly chart 时出错:', err); }
     });
 
 })();

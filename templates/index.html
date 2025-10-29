@@ -6,7 +6,21 @@
     <title>我的错题本</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- 引入 Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- 如果 CDN 加载失败，则回退到本地静态文件 -->
+    <script>
+        (function(){
+            // 如果 Chart 未定义，尝试静默加载本地备份文件 static/vendor/chart.min.js
+            if (typeof Chart === 'undefined') {
+                var s = document.createElement('script');
+                s.src = '/static/vendor/chart.min.js';
+                s.async = true;
+                s.onload = function(){ console.info('Loaded local Chart fallback'); };
+                s.onerror = function(){ console.error('Failed to load Chart from CDN and local fallback.'); };
+                document.head.appendChild(s);
+            }
+        })();
+    </script>
     <!-- 引入 TinyMCE 富文本编辑器 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js" referrerpolicy="origin"></script>
 </head>
@@ -197,13 +211,16 @@
     <script src="{{ url_for('static', filename='js/actions.js') }}"></script>
     <script src="{{ url_for('static', filename='js/careless.js') }}"></script>
     
-    <!-- 【新增】用于初始化页面加载时的每日总结图表 -->
+    <!-- 【新增】用于初始化页面加载时的每日总结图表（使用 ensureChartAvailable 防护并回退本地） -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 这里的 initialSummaryData 变量是在上面的 script 标签中定义的
-        if (initialSummaryData && initialSummaryData.subject_chart_data) {
-            const ctx = document.getElementById('subject-bar-chart-dynamic');
-            if (ctx) { // 确保 canvas 元素存在
+        if (!initialSummaryData || !initialSummaryData.subject_chart_data) return;
+
+        var initSubjectChart = function() {
+            try {
+                if (typeof Chart === 'undefined') { console.warn('Chart.js 未定义，无法渲染科目分布图'); return; }
+                const ctx = document.getElementById('subject-bar-chart-dynamic');
+                if (!ctx) return;
                 new Chart(ctx.getContext('2d'), {
                     type: 'bar',
                     data: { 
@@ -221,6 +238,20 @@
                         plugins: { legend: { display: false } } 
                     }
                 });
+            } catch (e) { console.error('初始化科目分布图失败', e); }
+        };
+
+        if (window.ensureChartAvailable) {
+            window.ensureChartAvailable(function() { initSubjectChart(); });
+        } else {
+            // 兜底：若 summary.js 未导出 ensureChartAvailable，则自行尝试本地回退加载再初始化
+            if (typeof Chart !== 'undefined') { initSubjectChart(); }
+            else {
+                var s = document.createElement('script');
+                s.src = '/static/vendor/chart.min.js';
+                s.onload = initSubjectChart;
+                s.onerror = function(){ console.error('无法加载本地 Chart 回退文件'); };
+                document.head.appendChild(s);
             }
         }
     });
