@@ -251,12 +251,24 @@ def regenerate_summary(date_str):
             # 所以我们继续流程，将其存入数据库
             print(f"AI generation failed with message: {ai_summary_content['error']}")
 
-        # 3. 准备新的数据结构
+        # 3. 准备新的数据结构，并把当天的粗心错误计入统计
         subject_counts = Counter(subjects_list)
+        careless_count = 0
+        try:
+            if hasattr(database, 'get_careless_count_by_date'):
+                careless_count = int(database.get_careless_count_by_date(date_str) or 0)
+        except Exception as e:
+            print(f"Failed to get careless count for {date_str}: {e}")
+
+        if careless_count and careless_count > 0:
+            subject_counts['计算错误'] = subject_counts.get('计算错误', 0) + careless_count
+
+        total_questions = len(questions_for_date) + (careless_count or 0)
+
         new_summary_data = {
             "date": date_str,
             "ai_summary": ai_summary_content,
-            "question_count": len(questions_for_date),
+            "question_count": total_questions,
             "subject_chart_data": {
                 "labels": list(subject_counts.keys()),
                 "data": list(subject_counts.values())
@@ -375,7 +387,21 @@ def chat_page(question_id):
         # 如果解析失败，提供默认空值
         q_dict['knowledge_points'], q_dict['ai_analysis'], q_dict['similar_examples'] = [], [], []
 
-    return render_template('chat.html', question=q_dict)
+    # 根据 User-Agent 简单判断移动端或桌面端，分别渲染不同模板以改善移动体验
+    ua = request.headers.get('User-Agent', '') or ''
+    ua_lower = ua.lower()
+    is_mobile = False
+    try:
+        # 常见移动端标识
+        if 'mobile' in ua_lower or 'android' in ua_lower or 'iphone' in ua_lower or 'ipad' in ua_lower:
+            is_mobile = True
+    except Exception:
+        is_mobile = False
+
+    if is_mobile:
+        return render_template('chat_mobile.html', question=q_dict)
+    else:
+        return render_template('chat_desktop.html', question=q_dict)
 
 
 @app.route('/chat-stream', methods=['POST'])
@@ -400,7 +426,7 @@ def get_or_generate_summary_for_date(date_str):
     一个可复用的辅助函数，用于获取或生成指定日期的总结。
     返回一个包含总结数据的字典，或在没有数据时返回 None。
     """
-    # 1. 尝试从数据库读取
+    # 1. 尝试从数据库读取（若存在则直接返回，saved_summary 中可能已包含粗心错误统计）
     saved_summary = database.get_summary_by_date(date_str)
     if saved_summary:
         print(f"Found saved summary for {date_str} in database.")
@@ -427,11 +453,25 @@ def get_or_generate_summary_for_date(date_str):
     
     ai_summary_content = core.generate_daily_summary_with_ai("\n".join(summary_text_list))
     subject_counts = Counter(subjects_list)
-    
+
+    # 统计当天的粗心错误数量（如果表中有该函数）
+    careless_count = 0
+    try:
+        if hasattr(database, 'get_careless_count_by_date'):
+            careless_count = int(database.get_careless_count_by_date(date_str) or 0)
+    except Exception as e:
+        print(f"Failed to get careless count for {date_str}: {e}")
+
+    # 如果存在粗心错误，则把它作为单独一类加入科目分布（标签为“计算错误”），并计入总数
+    if careless_count and careless_count > 0:
+        subject_counts['计算错误'] = subject_counts.get('计算错误', 0) + careless_count
+
+    total_questions = len(questions_for_date) + (careless_count or 0)
+
     daily_summary = {
         "date": date_str,
         "ai_summary": ai_summary_content,
-        "question_count": len(questions_for_date),
+        "question_count": total_questions,
         "subject_chart_data": {
             "labels": list(subject_counts.keys()),
             "data": list(subject_counts.values())

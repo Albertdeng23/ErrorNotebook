@@ -10,7 +10,7 @@ body {
 
 .container {
     /* 扩宽主容器以提升显示区域 */
-    max-width: 1600px; /* 从1200px拓宽到1600px */
+    max-width: 1200px; /* 从1200px拓宽到1600px */
     margin: 0 auto;
     background-color: #fff;
     padding: 24px 40px; /* 稍微增加内边距 */
@@ -42,7 +42,7 @@ h1 {
 
 .chart-container {
     flex: 1;
-    min-width: 380px; /* 放大图表区域，提供更宽展示 */
+    min-width: 300px; /* 放大图表区域，提供更宽展示 */
 }
 
 .summary-content {
@@ -135,7 +135,7 @@ h1 {
 
 .timeline-nav {
     /* 增宽左侧导航（含日历）以提供更宽的可点击区域 */
-    flex: 0 0 260px; /* 从180px扩大到260px */
+    flex: 0 0 180px; /* 从180px扩大到260px */
     border-right: 1px solid #e0e0e0;
     padding-right: 24px;
     height: calc(100vh - 250px); /* 视口高度减去一些边距，可根据总结区域高度微调 */
@@ -458,6 +458,69 @@ h1 {
     color: #888;
     display: none; /* 默认隐藏 */
 }
+
+/* =================== 手机端聊天页面优化 =================== */
+/* 仅在 mobile 聊天模板中启用：body.chat-page-body.mobile */
+.chat-page-body.mobile .chat-main {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #0f0f10; /* 与截图一致的深色背景 */
+}
+.chat-page-body.mobile .mobile-context {
+    display: block;
+}
+.chat-page-body.mobile .chat-messages {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 12px;
+    -webkit-overflow-scrolling: touch;
+}
+.chat-page-body.mobile .chat-input-area {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255,255,255,0.02);
+    border-top: 1px solid rgba(255,255,255,0.03);
+    padding: 8px 10px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 40;
+}
+.chat-page-body.mobile .chat-form { display:flex; gap:8px; align-items:flex-end; }
+.chat-page-body.mobile textarea#message-input {
+    flex: 1;
+    min-height: 44px;
+    max-height: 140px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.03);
+    color: #fff;
+    resize: none;
+}
+.chat-page-body.mobile #send-btn { width:56px; height:44px; border-radius:10px; background:#3498db; color:#fff; border:none; }
+
+.chat-page-body.mobile .message { display:flex; gap:10px; align-items:flex-start; margin-bottom:12px; }
+.chat-page-body.mobile .message .avatar { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; flex:0 0 36px; }
+.chat-page-body.mobile .message.ai { justify-content:flex-start; }
+.chat-page-body.mobile .message.user { justify-content:flex-end; flex-direction:row-reverse; }
+.chat-page-body.mobile .message .message-content { max-width:78%; padding:10px 12px; border-radius:10px; color:#fff; background: rgba(255,255,255,0.04); word-break:break-word; }
+.chat-page-body.mobile .message.user .message-content { background: linear-gradient(90deg,#2d9cdb,#1b7fb5); color:#fff; }
+.chat-page-body.mobile .message-toolbar { display:none; }
+
+/* 图片在手机端更宽并保持比例 */
+.chat-page-body.mobile .mobile-context img, .chat-page-body.mobile .question-block img, .chat-page-body.mobile #modal-image { max-width: 100%; height: auto; }
+
+/* 轻微抬高聊天区底部内边距，避免被输入栏覆盖 */
+.chat-page-body.mobile .chat-messages { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+
+/* 适配暗色背景下的侧边内容样式 */
+.chat-page-body.mobile .ai-analysis-content { color: #e6eef6; font-size: 14px; line-height:1.6; }
+
+/* 小屏幕下隐藏页面不必要的大边距 */
+@media (max-width: 420px) {
+    .container { padding-left: 8px; padding-right: 8px; }
 
 /* --- 日历导航样式 --- */
 #calendar-container {

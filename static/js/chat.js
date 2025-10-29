@@ -110,6 +110,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // ===================================================================
     // EVENT LISTENERS
     // ===================================================================
+    // Auto-resize textarea on input (mobile friendly)
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+
+    // On focus (mobile keyboard), scroll chat to bottom after a short delay
+    messageInput.addEventListener('focus', function() {
+        setTimeout(() => { chatMessages.scrollTop = chatMessages.scrollHeight; }, 300);
+    });
     chatForm.addEventListener('submit', (event) => {
         event.preventDefault();
         const userInput = messageInput.value.trim();
@@ -123,6 +133,11 @@ document.addEventListener('DOMContentLoaded', function() {
         addMessageToUI(userInput, 'user', newId);
         
         streamAIResponse(messages);
+    });
+
+    // Ensure when window resizes (keyboard show/hide) we keep scroll at bottom on mobile
+    window.addEventListener('resize', function() {
+        setTimeout(() => { chatMessages.scrollTop = chatMessages.scrollHeight; }, 250);
     });
 
     // Main event delegation for all message actions

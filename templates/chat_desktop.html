@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>与AI聊聊 - 桌面版</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="chat-page-body">
+    <!-- 桌面版与原 chat.html 保持一致，显示侧边栏与主聊天区 -->
+    <aside class="chat-sidebar">
+        <div class="sidebar-header">
+            <a href="/" title="返回主页">&larr;</a>
+            <h3>题目追问</h3>
+        </div>
+        <div class="sidebar-content">
+            <div class="question-block">
+                <h4>原题图片</h4>
+                <img id="sidebar-image" src="data:image/jpeg;base64,{{ question.original_image_b64 }}" alt="错题图片">
+
+                <h4>AI初步解析</h4>
+                <div class="ai-analysis-content">
+                    {{ question.problem_analysis | safe }}
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="chat-main">
+        <div id="chat-messages" class="chat-messages">
+            <div class="message ai">
+                <div class="avatar">🤖</div>
+                <div class="message-content">
+                    <p>你好！我是你的专属AI辅导老师。我已经阅读了这道题的背景，有什么具体问题，随时问我吧！</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <form id="chat-form" class="chat-form">
+                <textarea id="message-input" placeholder="请在此输入你的问题..." required rows="1"></textarea>
+                <button type="submit" id="send-btn" title="发送">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <div id="image-modal" class="image-modal">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="modal-image">
+    </div>
+
+    <script>
+        const initialQuestionData = {{ question | tojson }};
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+</body>
+</html>

@@ -211,6 +211,14 @@ def get_weekly_summary_stats() -> list:
         """)
         return cursor.fetchall()
 
+def get_careless_count_by_date(date_str: str) -> int:
+    """返回指定日期（YYYY-MM-DD）中粗心错误记录的数量。"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(id) as cnt FROM careless_mistakes WHERE date(upload_date) = ?", (date_str,))
+        row = cursor.fetchone()
+        return int(row['cnt']) if row else 0
+
 # 在 database.py 文件末尾添加这个新函数
 
 def migrate_db():

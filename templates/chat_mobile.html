@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>与AI聊聊 - 手机版</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* 手机端特定调整，保证输入栏固定、侧栏内容折叠在上方 */
+        body { margin: 0; padding: 0; }
+        .chat-main { display: flex; flex-direction: column; height: 100vh; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 12px; }
+        .chat-input-area { padding: 8px; border-top: 1px solid #eee; background: #fff; }
+        .chat-form { display: flex; gap: 8px; }
+        .chat-form textarea { flex: 1; min-height: 44px; max-height: 140px; padding: 8px; border-radius: 8px; border: 1px solid #ddd; }
+        .chat-form button { width: 56px; height: 44px; border-radius: 8px; background: #3498db; color: white; border: none; }
+        .mobile-context { padding: 12px; border-bottom: 1px solid #efefef; background: #fafafa; }
+        .mobile-context img { max-width: 100%; height: auto; border-radius: 6px; display: block; margin-bottom: 8px; }
+        .mobile-context .ai-analysis-content { font-size: 14px; color: #333; }
+    </style>
+</head>
+<body class="chat-page-body mobile">
+
+    <!-- 手机端把题目上下文放在聊天上方，方便滑动查看 -->
+    <div class="mobile-context">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <a href="/" title="返回主页">&larr;</a>
+            <strong>题目上下文</strong>
+        </div>
+        <div style="margin-top:8px;">
+            <img src="data:image/jpeg;base64,{{ question.original_image_b64 }}" alt="错题图片">
+            <div class="ai-analysis-content">{{ question.problem_analysis | safe }}</div>
+        </div>
+    </div>
+
+    <main class="chat-main">
+        <div id="chat-messages" class="chat-messages">
+            <div class="message ai">
+                <div class="avatar">🤖</div>
+                <div class="message-content">
+                    <p>你好！我是你的专属AI辅导老师。我已经阅读了这道题的背景，有什么具体问题，随时问我吧！</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <form id="chat-form" class="chat-form">
+                <textarea id="message-input" placeholder="请在此输入你的问题..." required rows="1"></textarea>
+                <button type="submit" id="send-btn" title="发送">发</button>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        const initialQuestionData = {{ question | tojson }};
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+</body>
+</html>

@@ -141,19 +141,17 @@
                     <h3>可能的错误</h3><ul class="ai-analysis-errors">${(q.ai_analysis||[]).map(e => `<li>${e}</li>`).join('')}</ul>
                     <h3>例题练手</h3><div class="similar-examples-content">${(q.similar_examples||[]).map(ex => `<div class="example"><strong>题目：</strong> ${ex.question}<br><strong>解答：</strong><br><div>${window.markdownToHtml ? window.markdownToHtml(ex.answer) : ex.answer}</div></div>`).join('')}</div>
                 </div>
-                ${q.my_insight ? `
-                <!-- 我的灵光一闪 注释栏 -->
+                <!-- 我的灵光一闪 注释栏（始终渲染，但内容根据是否已有注释变化） -->
                 <div class="insight-panel" data-question-id="${q.id}">
                     <h3 class="insight-title">我的灵光一闪</h3>
-                    <div class="insight-display">${q.my_insight}</div>
-                    <textarea class="insight-editor" style="display:none;">${q.my_insight}</textarea>
+                    <div class="insight-display">${q.my_insight ? q.my_insight : '<em class="muted">还没有添加你的灵光一闪，点添加写下你的想法。</em>'}</div>
+                    <textarea class="insight-editor" style="display:none;">${q.my_insight ? q.my_insight : ''}</textarea>
                     <div class="insight-controls">
-                        <button class="insight-btn" data-action="edit-insight">编辑</button>
+                        <button class="insight-btn" data-action="edit-insight">${q.my_insight ? '编辑' : '添加'}</button>
                         <button class="insight-btn" data-action="save-insight" style="display:none;">保存</button>
                         <button class="insight-btn" data-action="cancel-insight" style="display:none;">取消</button>
                     </div>
                 </div>
-                ` : ''}
             </div>`;
         });
         container.dataset.lastDate = lastDate;
