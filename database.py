@@ -1,6 +1,9 @@
 import sqlite3
 import json
 from datetime import datetime
+import re
+from collections import defaultdict
+
 # 定义数据库文件的名称
 DATABASE_NAME = "database.db"
 
@@ -89,13 +92,13 @@ def get_careless_mistakes(limit: int, offset: int) -> list:
 
 def add_question(question_data: dict):
     """
-    将一个处理好的错题数据字典添加到数据库中。
+    【已更新】将一个处理好的错题数据字典（包含关键词）添加到数据库中。
     """
     sql = """
         INSERT INTO questions (
             subject, upload_date, original_image_b64, user_question, problem_analysis, 
-            knowledge_points, ai_analysis, similar_examples
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            knowledge_points, ai_analysis, similar_examples, keywords
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -104,11 +107,12 @@ def add_question(question_data: dict):
                 question_data.get('subject'),
                 question_data.get('upload_date'),
                 question_data.get('original_image_b64'),
-                question_data.get('user_question'), # 新增
+                question_data.get('user_question'),
                 question_data.get('problem_analysis'),
                 question_data.get('knowledge_points'),
                 question_data.get('ai_analysis'),
-                question_data.get('similar_examples')
+                question_data.get('similar_examples'),
+                question_data.get('keywords') # 【新增】添加 keywords 参数
             ))
             conn.commit()
             print(f"Successfully added a new question for subject: {question_data.get('subject')}")
@@ -258,6 +262,19 @@ def migrate_db():
         else:
             print("Column 'my_insight' already exists. No migration needed.")
 
+        # 【新增】检查 'keywords' 列是否存在
+        if 'keywords' not in columns:
+            try:
+                print("Column 'keywords' not found. Adding it now...")
+                cursor.execute("ALTER TABLE questions ADD COLUMN keywords TEXT") # 默认是 NULL
+                conn.commit()
+                print("Successfully added 'keywords' column to the database.")
+            except sqlite3.Error as e:
+                print(f"Failed to add 'keywords' column. Error: {e}")
+        else:
+            print("Column 'keywords' already exists. No migration needed.")
+
+
 def add_daily_summary(summary_data: dict):
     """将生成的每日总结存入数据库"""
     sql = """
@@ -351,7 +368,127 @@ def update_question_insight(question_id: int, insight: str):
         conn.commit()
         print(f"Updated my_insight for question ID: {question_id}")
 
+# 【新增】获取所有需要生成关键词的错题
+def get_all_questions_for_keyword_generation():
+    """获取所有尚未生成关键词的错题的 ID 和 problem_analysis。"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        # 我们只选择 keywords 字段为 NULL 的记录
+        cursor.execute("SELECT id, problem_analysis FROM questions WHERE keywords IS NULL")
+        return cursor.fetchall()
 
+# 【新增】根据 ID 更新错题的关键词
+def update_question_keywords(question_id: int, keywords: str):
+    """为指定的错题 ID 更新 keywords 字段。"""
+    with get_db_connection() as conn:
+        conn.execute('UPDATE questions SET keywords = ? WHERE id = ?', (keywords, question_id))
+        conn.commit()
+        print(f"Updated keywords for question ID: {question_id}")
+
+# 【新增】获取所有关键词，用于生成搜索筛选器
+def get_search_filters():
+    """
+    从数据库中提取所有关键词，并构建一个层级结构的字典用于前端筛选。
+    返回格式: {'物理化学': {'电化学', '热力学'}, '高等数学': {'微积分'}}
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT keywords FROM questions WHERE keywords IS NOT NULL")
+        rows = cursor.fetchall()
+        
+        filters = defaultdict(set)
+        # 正则表达式用于解析格式：[科目]-[知识面]-[...]
+        pattern = re.compile(r"\[([^\]]+)\]-\[([^\]]+)\]-.*")
+        
+        for row in rows:
+            match = pattern.match(row['keywords'])
+            if match:
+                subject, knowledge_area = match.groups()
+                filters[subject].add(knowledge_area)
+        
+        # 将 set 转换为 list 以便 JSON 序列化
+        return {subject: sorted(list(areas)) for subject, areas in filters.items()}
+
+# 【核心修改】核心搜索函数
+def search_questions(query_text: str = "", filters: dict = None, image_keywords_str: str = ""):
+    """
+    【最终版】在数据库中搜索错题。
+    支持在所有主要文本字段中进行匹配：
+    'keywords', 'problem_analysis', 'knowledge_points', 'ai_analysis', 'similar_examples', 'user_question'
+    同时支持筛选条件和图片关键词匹配。
+    """
+    if filters is None:
+        filters = {}
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # 基础查询
+        sql_query = "SELECT * FROM questions WHERE keywords IS NOT NULL"
+        params = []
+
+        # 1. 根据筛选器缩小范围 (这部分逻辑不变)
+        selected_subjects = filters.get('subjects', [])
+        selected_areas = filters.get('areas', [])
+        
+        if selected_subjects:
+            subject_clauses = " OR ".join(["keywords LIKE ?"] * len(selected_subjects))
+            sql_query += f" AND ({subject_clauses})"
+            params.extend([f"[{subject}]-%" for subject in selected_subjects])
+        
+        if selected_areas:
+            area_clauses = " OR ".join(["keywords LIKE ?"] * len(selected_areas))
+            sql_query += f" AND ({area_clauses})"
+            params.extend([f"%- [{area}]-%" for area in selected_areas])
+
+        # 2. 【核心修改】根据文本查询进一步筛选，扩展搜索范围
+        if query_text:
+            # 构建一个包含所有要搜索的字段的 OR 条件
+            search_fields = [
+                "keywords",           # 关键词
+                "problem_analysis",   # AI解析
+                "knowledge_points",   # 核心知识点
+                "ai_analysis",        # 可能的错误
+                "similar_examples",   # 相似例题
+                "user_question"       # 自己的疑问
+            ]
+            
+            # 生成 SQL 子句，例如: (keywords LIKE ? OR problem_analysis LIKE ? OR ...)
+            text_search_clause = " OR ".join([f"{field} LIKE ?" for field in search_fields])
+            sql_query += f" AND ({text_search_clause})"
+            
+            # 为每个 '?' 占位符添加参数
+            search_term = f"%{query_text}%"
+            params.extend([search_term] * len(search_fields))
+
+        cursor.execute(sql_query, params)
+        candidate_questions = cursor.fetchall()
+
+        # 3. 如果是图片搜索，则进行相似度排序 (这部分逻辑不变)
+        if image_keywords_str:
+            # ... (这部分代码完全不变) ...
+            search_kws_match = re.search(r"\[.*\]-\[.*\]-\[(.*)\]", image_keywords_str)
+            if not search_kws_match:
+                return []
+            search_kws_set = set(kw.strip() for kw in search_kws_match.group(1).split(','))
+
+            scored_questions = []
+            for q in candidate_questions:
+                q_dict = dict(q)
+                q_kws_match = re.search(r"\[.*\]-\[.*\]-\[(.*)\]", q_dict['keywords'])
+                if not q_kws_match:
+                    continue
+                
+                q_kws_set = set(kw.strip() for kw in q_kws_match.group(1).split(','))
+                
+                score = len(search_kws_set.intersection(q_kws_set))
+                if score > 0:
+                    q_dict['match_score'] = score
+                    scored_questions.append(q_dict)
+            
+            return sorted(scored_questions, key=lambda x: x['match_score'], reverse=True)
+        else:
+            return [dict(q) for q in candidate_questions]
 # --- 用于独立测试本模块功能的示例 ---
 if __name__ == '__main__':
     print("--- Running database module tests ---")

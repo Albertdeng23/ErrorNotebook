@@ -484,6 +484,56 @@ def get_or_generate_summary_for_date(date_str):
     
     return daily_summary
 
+# 【新增】获取搜索筛选器数据的API
+@app.route('/get-search-filters')
+def api_get_search_filters():
+    try:
+        filters = database.get_search_filters()
+        return jsonify(filters)
+    except Exception as e:
+        print(f"Error in /get-search-filters: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+# 【新增】处理搜索请求的API
+@app.route('/search', methods=['POST'])
+def search():
+    try:
+        query_text = request.form.get('query', '')
+        filters_json = request.form.get('filters', '{}')
+        filters = json.loads(filters_json)
+        image_file = request.files.get('image')
+        
+        image_keywords = ""
+        if image_file:
+            print("Image file detected in search request.")
+            image_bytes = image_file.read()
+            image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # 调用 core 函数为图片生成关键词
+            result = core.generate_keywords_for_image(image_b64)
+            if 'error' in result:
+                return jsonify({"error": f"AI keyword generation failed: {result['error']}"}), 500
+            image_keywords = result.get('keywords', '')
+            print(f"Generated keywords from image: {image_keywords}")
+
+        # 调用数据库搜索函数
+        results = database.search_questions(query_text, filters, image_keywords)
+        
+        # 将结果中的JSON字符串字段转换为Python对象
+        for item in results:
+            try:
+                item['knowledge_points'] = json.loads(item['knowledge_points'])
+                item['ai_analysis'] = json.loads(item['ai_analysis'])
+                item['similar_examples'] = json.loads(item['similar_examples'])
+            except (json.JSONDecodeError, TypeError):
+                continue # 忽略解析失败的字段
+
+        return jsonify(results)
+
+    except Exception as e:
+        print(f"An unexpected error occurred in /search: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
 # --- 4. 启动应用 ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

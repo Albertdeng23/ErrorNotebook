@@ -36,7 +36,7 @@
                 <canvas id="weekly-chart"></canvas>
             </div>
 
-            <!-- 【已修改】右侧：每日总结 (现在是一个动态容器) -->
+            <!-- 右侧：每日总结 (动态容器) -->
             <div id="daily-summary-container" class="summary-content">
                 {% if initial_summary_data %}
                 <!-- 如果后端传来了初始数据，直接渲染 -->
@@ -76,6 +76,8 @@
             <button class="tab-btn active" data-tab="review-tab">错题回顾</button>
             <button class="tab-btn" data-tab="careless-mistake-tab">计算错误</button>
             <button class="tab-btn" data-tab="upload-tab">上传新题</button>
+            <!-- 【新增】搜索按钮 -->
+            <button class="tab-btn" data-tab="search-tab">搜索题目</button>
         </div>
 
         <!-- 主选项卡内容 -->
@@ -191,6 +193,48 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 【新增】4. 搜索题目面板 -->
+            <div id="search-tab" class="tab-pane">
+                <div class="search-container">
+                    <form id="search-form" class="search-form">
+                        <div class="search-bar">
+                            <input type="text" id="search-query" placeholder="输入关键词或上传图片进行搜索...">
+                            <label for="search-image-input" class="image-upload-btn" title="上传图片搜索">🖼️</label>
+                            <input type="file" id="search-image-input" accept="image/*" style="display: none;">
+                            <button type="submit">🔍</button>
+                        </div>
+                        <div id="search-image-preview"></div>
+                    </form>
+
+                    <div class="detailed-search-toggle">
+                        <label><input type="checkbox" id="toggle-filters"> 详细搜索</label>
+                    </div>
+
+                    <div id="search-filters" class="search-filters-container" style="display: none;">
+                        <div class="filter-group">
+                            <h4>科目</h4>
+                            <div id="subject-filters" class="filter-options">
+                                <!-- 科目筛选器将由JS动态生成 -->
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <h4>知识面</h4>
+                            <div id="knowledge-area-filters" class="filter-options">
+                                <p class="filter-placeholder">请先选择科目</p>
+                                <!-- 知识面筛选器将由JS动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="search-results-container" class="search-results">
+                    <!-- 搜索结果将由JS动态加载 -->
+                    <div class="placeholder">输入关键词或上传图片，开始你的搜索吧！</div>
+                </div>
+                <div id="search-loader" class="loader" style="display: none;">正在搜索中...</div>
+            </div>
+
         </div>
     </div>
 
@@ -202,7 +246,9 @@
         // 【关键】将初始总结数据也传递给JS
         const initialSummaryData = {{ initial_summary_data | tojson }};
     </script>
-    <!-- 拆分后的脚本：按依赖顺序加载（utils -> summary -> calendar -> tabs -> upload -> actions -> careless） -->
+    <!-- 【已修改】从本地引入 marked.js 用于 Markdown 渲染 -->
+    <script src="{{ url_for('static', filename='vendor/marked.min.js') }}"></script>
+    <!-- 拆分后的脚本：按依赖顺序加载 -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
     <script src="{{ url_for('static', filename='js/calendar.js') }}"></script>
@@ -210,6 +256,8 @@
     <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
     <script src="{{ url_for('static', filename='js/actions.js') }}"></script>
     <script src="{{ url_for('static', filename='js/careless.js') }}"></script>
+    <!-- 【新增】引入 search.js -->
+    <script src="{{ url_for('static', filename='js/search.js') }}"></script>
     
     <!-- 【新增】用于初始化页面加载时的每日总结图表（使用 ensureChartAvailable 防护并回退本地） -->
     <script>

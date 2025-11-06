@@ -55,11 +55,9 @@ def encode_image_to_base64(image_bytes: bytes) -> str:
     """
     return base64.b64encode(image_bytes).decode('utf-8')
 
-
 def analyze_question_with_ai(image_base64: str, user_question: str = "") -> dict:
     """
-    调用AI模型分析错题图片，并返回结构化的解析结果。
-    (增强了错误处理和调试能力)
+    【已更新】调用AI模型分析错题图片，并一次性返回包括关键词在内的所有结构化解析结果。
     """
     if not client:
         return {"error": "AI client is not initialized."}
@@ -77,16 +75,13 @@ def analyze_question_with_ai(image_base64: str, user_question: str = "") -> dict
     JSON格式要求如下：
     {
       "problem_analysis": "对题目的详细解析，包括解题步骤和思路。",
+      "keywords": "格式为 [主要科目]-[知识面]-[关键词1, 关键词2, 关键词3] 的字符串，用于检索。",
       "knowledge_points": "一个字符串列表，列出这道题考察的核心知识点。",
       "possible_errors": "一个字符串列表，列出学生在做这道题时最容易犯的错误。",
       "similar_examples": [
         {
           "question": "这里是第一道相似例题的题干",
           "answer": "这里是第一道相似例题的详细解答"
-        },
-        {
-          "question": "这里是第二道相似例题的题干",
-          "answer": "这里是第二道相似例题的详细解答"
         }
       ]
     }
@@ -96,7 +91,7 @@ def analyze_question_with_ai(image_base64: str, user_question: str = "") -> dict
         prompt_text += f"\n请特别注意，学生对这道题有以下疑问，请在你的分析中侧重解答：'{user_question}'"
 
     try:
-        print("Sending request to AI API...")
+        print("Sending request to AI API for full analysis...")
         response = client.chat.completions.create(
             model=AI_MODEL,
             messages=[
@@ -116,11 +111,10 @@ def analyze_question_with_ai(image_base64: str, user_question: str = "") -> dict
             response_format={"type": "json_object"},
             max_tokens=8192,
         )
-        print("AI response received.")
+        print("AI full analysis received.")
         
         ai_result_str = response.choices[0].message.content
         
-        # --- 关键改动：增加调试打印和更具体的错误捕获 ---
         print("--- Raw AI Response Content ---")
         print(ai_result_str)
         print("-----------------------------")
@@ -128,14 +122,14 @@ def analyze_question_with_ai(image_base64: str, user_question: str = "") -> dict
         try:
             ai_result_json = json.loads(ai_result_str)
         except json.JSONDecodeError:
-            # 如果解析失败，返回一个包含原始响应的、更详细的错误信息
-            error_message = f"AI返回的不是有效的JSON格式。原始响应内容: '{ai_result_str[:500]}...'" # 只显示前500个字符避免刷屏
+            error_message = f"AI返回的不是有效的JSON格式。原始响应内容: '{ai_result_str[:500]}...'"
             print(error_message)
             return {"error": error_message}
-        # --- 改动结束 ---
         
+        # 【修改】返回包含新 keywords 字段的完整解析结果
         return {
             "problem_analysis": ai_result_json.get("problem_analysis", "AI未提供题目解析。"),
+            "keywords": ai_result_json.get("keywords"), # 新增
             "knowledge_points": ai_result_json.get("knowledge_points", []),
             "possible_errors": ai_result_json.get("possible_errors", []),
             "similar_examples": ai_result_json.get("similar_examples", [])
@@ -149,44 +143,31 @@ def analyze_question_with_ai(image_base64: str, user_question: str = "") -> dict
 
 def process_new_question(image_bytes: bytes, subject: str, user_question: str = "") -> dict:
     """
-    处理一个新的错题上传请求的完整流程。
-
-    Args:
-        image_bytes: 用户上传的图片原始二进制数据。
-        subject: 题目所属科目。
-        user_question: 用户的个人疑问（可选）。
-
-    Returns:
-        一个符合存储到数据库要求的数据结构字典。
+    【已更新】处理一个新的错题上传请求的完整流程，现在会包含关键词。
     """
     # 1. 将图片编码为Base64
     image_b64 = encode_image_to_base64(image_bytes)
     
-    # 2. 调用AI进行分析
+    # 2. 调用AI进行分析 (新函数会返回包含关键词的结果)
     ai_analysis_result = analyze_question_with_ai(image_b64, user_question)
 
-    # 如果AI分析出错，直接返回错误信息
     if "error" in ai_analysis_result:
         return ai_analysis_result
 
     # 3. 组装最终的数据结构
-    # 将AI返回的各个部分整合到我们最终的数据结构中
     final_data = {
         "original_image_b64": image_b64,
         "subject": subject,
         "user_question": user_question,
         "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        # 将AI返回的几个部分分别存入对应字段
         "problem_analysis": ai_analysis_result.get("problem_analysis"),
-        # 将知识点和可能错误列表转换为JSON字符串以便存储
+        "keywords": ai_analysis_result.get("keywords"), # 【新增】将关键词添加到数据结构中
         "knowledge_points": json.dumps(ai_analysis_result.get("knowledge_points", []), ensure_ascii=False),
-        "ai_analysis": json.dumps(ai_analysis_result.get("possible_errors", []), ensure_ascii=False), # 复用ai_analysis字段存储“可能的错误”
-        "similar_examples": json.dumps(ai_analysis_result.get("similar_examples", []), ensure_ascii=False) # 将例题列表转换为JSON字符串
+        "ai_analysis": json.dumps(ai_analysis_result.get("possible_errors", []), ensure_ascii=False),
+        "similar_examples": json.dumps(ai_analysis_result.get("similar_examples", []), ensure_ascii=False)
     }
     
     return final_data
-
-
 
 # 在 core.py 文件中
 
@@ -309,6 +290,55 @@ def chat_with_ai_stream(messages: list):
     except Exception as e:
         print(f"An error occurred during AI stream chat: {e}")
         yield f'{{"error": "与AI通信时发生错误: {str(e)}"}}'
+
+
+# 【新增】为图片生成关键词
+def generate_keywords_for_image(image_base64: str) -> dict:
+    """
+    调用AI模型分析错题图片，并返回结构化的关键词。
+    """
+    if not client:
+        return {"error": "AI client is not initialized."}
+
+    prompt_text = """
+    你是一个信息检索专家。你的任务是分析用户上传的错题图片，提取最核心的关键词。
+    请严格按照以下格式返回你的分析结果，不要有任何多余的解释或前言。
+
+    格式要求: [主要科目]-[知识面]-[关键词1, 关键词2, 关键词3]
+
+    例如，如果图片内容是关于电化学的，你的输出应该是：[物理化学]-[电化学]-[能斯特方程的应用, 平均离子活度, 吉布斯自由能]
+    又例如，如果图片内容是关于微积分的，你的输出应该是：[高等数学]-[微积分]-[洛必达法则, 极限求解, 导数应用]
+    """
+
+    try:
+        print("Sending request to AI API for image keyword generation...")
+        response = client.chat.completions.create(
+            model=AI_MODEL, # 使用 .env 中的模型
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt_text},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=200,
+            temperature=0.1,
+        )
+        print("AI response received for image keywords.")
+        
+        keywords = response.choices[0].message.content.strip()
+        return {"keywords": keywords}
+
+    except Exception as e:
+        print(f"An error occurred during AI image keyword generation: {e}")
+        return {"error": str(e)}
 
 
 # --- 这是一个用于独立测试本模块功能的示例 ---

@@ -521,6 +521,7 @@ h1 {
 /* 小屏幕下隐藏页面不必要的大边距 */
 @media (max-width: 420px) {
     .container { padding-left: 8px; padding-right: 8px; }
+}
 
 /* --- 日历导航样式 --- */
 #calendar-container {
@@ -1073,4 +1074,139 @@ h1 {
     background-color: #f5f5f5;
     cursor: not-allowed;
     color: #999;
+}
+/* in static/css/style.css */
+
+/* --- 搜索选项卡样式 (已修复) --- */
+.search-container {
+    padding: 20px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background-color: #fafafa;
+    margin-bottom: 20px;
+}
+
+.search-form .search-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.search-form .search-bar input[type="text"] {
+    flex-grow: 1;
+    padding: 10px 15px;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    font-size: 16px;
+}
+
+.search-form .search-bar .image-upload-btn {
+    cursor: pointer;
+    font-size: 24px;
+    padding: 5px;
+    line-height: 1;
+    user-select: none;
+}
+
+.search-form .search-bar button[type="submit"] {
+    padding: 10px 20px;
+    border-radius: 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+}
+.search-form .search-bar button[type="submit"]:hover {
+    background-color: #2980b9;
+}
+
+#search-image-preview {
+    margin-top: 15px;
+    text-align: center;
+}
+
+#search-image-preview img {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.detailed-search-toggle {
+    margin-top: 15px;
+    font-size: 14px;
+    color: #555;
+}
+
+.search-filters-container {
+    display: flex;
+    gap: 30px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.filter-group {
+    flex: 1;
+}
+
+.filter-group h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 5px;
+}
+
+.filter-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+.filter-options label {
+    display: block;
+    cursor: pointer;
+}
+
+.filter-placeholder {
+    color: #888;
+    font-style: italic;
+}
+
+.search-results {
+    margin-top: 20px;
+    /* 【新增】让搜索结果区域可以滚动，而不是撑开整个页面 */
+    max-height: calc(100vh - 450px); /* 可根据实际情况微调 */
+    overflow-y: auto;
+    padding-right: 10px; /* 为滚动条留出空间 */
+}
+
+/* 【新增】为搜索结果中的错题块内容添加 flex 布局，实现左图右解析 */
+.search-results .question-content-wrapper {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.search-results .question-image-wrapper {
+    flex: 1;
+    min-width: 300px; /* 保证图片区域不会被过度挤压 */
+}
+
+.search-results .question-analysis-wrapper {
+    flex: 1.5; /* 让解析区域更宽一些 */
+}
+
+/* 
+   【关键修复】确保图片在 flex 容器中保持比例。
+   .question-block img 样式已在全局定义，这里是双重保险。
+*/
+.search-results .question-block img {
+    max-width: 100%;
+    height: auto; /* 强制高度自动，防止拉伸 */
+    object-fit: contain; /* 保证图片内容完整显示 */
 }
