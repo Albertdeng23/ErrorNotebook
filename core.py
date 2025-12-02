@@ -109,7 +109,7 @@ def analyze_question_with_ai(image_base64: str, user_question: str = "") -> dict
                 }
             ],
             response_format={"type": "json_object"},
-            max_tokens=8192,
+            max_tokens=16384,
         )
         print("AI full analysis received.")
         
